@@ -298,8 +298,13 @@ const App = {
       MapManager.recenterRide();
     });
 
-    // Exit button
+    // Exit button (FAB)
     document.getElementById('rideExitBtn')?.addEventListener('click', () => {
+      this.exitRideMode();
+    });
+
+    // Exit button (top banner)
+    document.getElementById('rideBannerExitBtn')?.addEventListener('click', () => {
       this.exitRideMode();
     });
   },

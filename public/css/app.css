@@ -276,6 +276,18 @@ body.ride-mode {
   backdrop-filter: blur(10px);
 }
 
+.ride-banner-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ride-banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .ride-banner-minimal .ride-next-main {
   font-size: 18px;
   font-weight: 700;
@@ -287,6 +299,25 @@ body.ride-mode {
   margin-top: 4px;
   font-size: 13px;
   color: rgba(255,255,255,0.8);
+}
+
+.ride-banner-exit {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ride-banner-exit:active {
+  background: rgba(255,255,255,0.25);
 }
 
 /* Collapsible stats panel */

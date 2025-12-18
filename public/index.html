@@ -127,8 +127,11 @@
     <section id="rideOverlay" class="ride-overlay hidden">
       <!-- Compact top banner: next turn only -->
       <div class="ride-banner-minimal">
-        <div class="ride-next-main" id="rideNextInstruction">Ready to ride</div>
-        <div class="ride-next-meta" id="rideNextMeta">Waiting for GPS...</div>
+        <div class="ride-banner-content">
+          <div class="ride-next-main" id="rideNextInstruction">Ready to ride</div>
+          <div class="ride-next-meta" id="rideNextMeta">Waiting for GPS...</div>
+        </div>
+        <button id="rideBannerExitBtn" class="ride-banner-exit" aria-label="Exit ride">✕</button>
       </div>
 
       <!-- Collapsible stats panel (hidden by default) -->
