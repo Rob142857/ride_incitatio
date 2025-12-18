@@ -136,6 +136,7 @@
       const status = document.getElementById('deleteStatus');
       const confirmInput = document.getElementById('deleteConfirm');
       let authedUser = null;
+      const pendingReauthKey = 'ride_pending_purge_reauth';
 
       function setStatus(message, tone) {
         status.textContent = message;
@@ -184,53 +185,30 @@
         syncButtonState();
       }
 
+      function clearPendingReauth() {
+        try { localStorage.removeItem(pendingReauthKey); } catch (_) {}
+      }
+
       if (btn) {
         btn.addEventListener('click', async () => {
-          await refreshAuthState();
-          if (!authedUser) {
-            openLoginModal();
-            setStatus('Sign in to delete your data.', 'error');
-            return;
-          }
-
           if (!typedDeleteOk()) {
             setStatus('Type DELETE to confirm.', 'error');
             return;
           }
 
-          const confirmDelete = window.confirm('Delete all your trips, waypoints, notes, and attachments? This cannot be undone.');
-          if (!confirmDelete) return;
-
+          // Always require a fresh login before deletion
+          setStatus('Please re-authenticate to continue.', 'error');
+          btn.textContent = 'Awaiting login...';
           btn.disabled = true;
-          btn.textContent = 'Deleting...';
-          setStatus('Working on it...', '');
 
           try {
-            const response = await fetch('/api/user/purge', {
-              method: 'POST',
-              credentials: 'include',
-              cache: 'no-store'
-            });
-
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              throw new Error(data.error || 'Could not delete data.');
-            }
-
-            const count = typeof data.deleted_objects === 'number' ? data.deleted_objects : null;
-            const summary = count !== null ? `Deleted ${count} attachment file(s) and all related trip data.` : 'Deleted your trips, waypoints, notes, and attachments.';
-            setStatus(summary, 'success');
-            btn.textContent = 'Deleted';
-          } catch (err) {
-            const message = err?.message || 'Something went wrong.';
-            if (message.toLowerCase().includes('unauthorized')) {
-              setStatus('Please sign in first, then return to delete your data.', 'error');
-            } else {
-              setStatus(message, 'error');
-            }
-            btn.disabled = false;
-            btn.textContent = 'Delete my Ride data';
+            await API.auth.logout();
+          } catch (_) {
+            // best-effort logout; continue to require re-login
           }
+
+          try { localStorage.setItem(pendingReauthKey, '1'); } catch (_) {}
+          openLoginModal();
         });
       }
 
@@ -252,8 +230,22 @@
         });
       }
 
-      // Initial auth check on load to enable the button once signed in
-      refreshAuthState();
+      // Initial auth check; if returning from reauth, prompt to click again
+      (async () => {
+        await refreshAuthState();
+        let pending = false;
+        try { pending = localStorage.getItem(pendingReauthKey) === '1'; } catch (_) {}
+        if (pending) {
+          clearPendingReauth();
+          if (authedUser) {
+            setStatus('Authenticated. Click delete again to finish.', 'success');
+            btn.textContent = 'Delete my Ride data';
+            btn.disabled = !typedDeleteOk();
+          } else {
+            setStatus('Please sign in to continue deletion.', 'error');
+          }
+        }
+      })();
     })();
   </script>
 </body>
