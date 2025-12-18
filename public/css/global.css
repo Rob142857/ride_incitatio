@@ -16,6 +16,16 @@
   --border: var(--neutral-200);
   --radius: 0.5rem;
   --shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+  
+  /* Elegant Archive-inspired additions */
+  --ease-elegant: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 0.15s var(--ease-elegant);
+  --transition-base: 0.25s var(--ease-elegant);
+  --transition-slow: 0.4s var(--ease-smooth);
+  --shadow-elegant: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 25px 80px rgba(0, 0, 0, 0.25), 0 10px 30px rgba(0, 0, 0, 0.15);
 }
 
 /* CSS Reset & Antialiasing */
