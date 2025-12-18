@@ -168,6 +168,7 @@ const MapManager = {
           steps
         });
 
+        this.prefetchTiles(route.coordinates);
         UI.showToast('Rerouted', 'info');
       }
     });
@@ -176,38 +177,36 @@ const MapManager = {
   prefetchTiles(coords) {
     if (!coords || !coords.length) return;
     const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-    const zoom = 13;
     const subs = ['a', 'b', 'c'];
+    const zoom = Math.min(Math.max(Math.round(this.map?.getZoom?.() || 14), 10), 17);
+    const radius = 2; // fetch 5x5 tiles around sampled points
 
     const toTile = (lat, lng, z) => {
       const x = Math.floor((lng + 180) / 360 * Math.pow(2, z));
-      const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * Math.pow(2, z));
+      const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
       return { x, y };
     };
 
-    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-    coords.forEach(c => {
-      minLat = Math.min(minLat, c.lat);
-      maxLat = Math.max(maxLat, c.lat);
-      minLng = Math.min(minLng, c.lng);
-      maxLng = Math.max(maxLng, c.lng);
-    });
-
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLng = (minLng + maxLng) / 2;
-    const centerTile = toTile(centerLat, centerLng, zoom);
+    const keyPoints = [coords[0], coords[Math.floor(coords.length / 2)], coords[coords.length - 1]].filter(Boolean);
+    const fetched = new Set();
 
     const fetchTile = (x, y) => {
+      const key = `${x}:${y}`;
+      if (fetched.has(key)) return;
+      fetched.add(key);
       const sub = subs[Math.abs(x + y) % subs.length];
       const url = tileUrl.replace('{s}', sub).replace('{z}', zoom).replace('{x}', x).replace('{y}', y);
       fetch(url, { mode: 'no-cors' }).catch(() => {});
     };
 
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        fetchTile(centerTile.x + dx, centerTile.y + dy);
+    keyPoints.forEach((pt) => {
+      const tile = toTile(pt.lat, pt.lng, zoom);
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          fetchTile(tile.x + dx, tile.y + dy);
+        }
       }
-    }
+    });
   },
 
   /**
@@ -462,6 +461,8 @@ const MapManager = {
           coordinates: route.coordinates,
           steps
         });
+
+        this.prefetchTiles(route.coordinates);
       }
     });
   },

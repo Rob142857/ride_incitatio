@@ -8,6 +8,10 @@ const App = {
   useCloud: false, // Will be true when deployed to Cloudflare
   isSharedView: false,
   isRiding: false,
+  rideVisitedWaypoints: null,
+  rideRerouting: false,
+  offRouteCounter: 0,
+  lastRerouteAt: 0,
   loginPromptShown: false,
   tripDetailId: null,
 
@@ -166,7 +170,9 @@ const App = {
    * Placeholder: tile prefetch could be added here (e.g., fetch surrounding tiles by bounding box)
    */
   prefetchTiles() {
-    // TODO: implement lightweight tile warmup around route
+    if (this.currentTrip?.route?.coordinates) {
+      MapManager.prefetchTiles(this.currentTrip.route.coordinates);
+    }
   },
 
   /**
@@ -183,6 +189,10 @@ const App = {
     }
 
     this.isRiding = true;
+    this.rideVisitedWaypoints = new Set();
+    this.rideRerouting = false;
+    this.offRouteCounter = 0;
+    this.lastRerouteAt = 0;
     document.getElementById('rideOverlay')?.classList.remove('hidden');
     document.body.classList.add('ride-mode');
 
@@ -194,12 +204,16 @@ const App = {
     document.getElementById('rideNextInstruction').textContent = 'Follow the route';
     document.getElementById('rideNextMeta').textContent = 'Waiting for GPS...';
     this.precomputeRouteMetrics();
+    this.prefetchTiles();
 
     MapManager.startRide((pos) => this.onRidePosition(pos));
   },
 
   exitRideMode() {
     this.isRiding = false;
+    this.rideVisitedWaypoints = null;
+    this.rideRerouting = false;
+    this.offRouteCounter = 0;
     document.getElementById('rideOverlay')?.classList.add('hidden');
     document.body.classList.remove('ride-mode');
     MapManager.stopRide();
@@ -229,11 +243,41 @@ const App = {
     return 2 * R * Math.asin(Math.sqrt(h));
   },
 
+  markVisitedWaypoints(position) {
+    if (!this.currentTrip?.waypoints) return;
+    const threshold = 40; // meters
+    if (!this.rideVisitedWaypoints) this.rideVisitedWaypoints = new Set();
+
+    this.currentTrip.waypoints.forEach((wp) => {
+      if (this.rideVisitedWaypoints.has(wp.id)) return;
+      const d = this.haversine(wp, position);
+      if (d <= threshold) {
+        this.rideVisitedWaypoints.add(wp.id);
+      }
+    });
+  },
+
+  getRemainingWaypoints() {
+    if (!this.currentTrip?.waypoints) return [];
+    if (!this.rideVisitedWaypoints) this.rideVisitedWaypoints = new Set();
+    return [...this.currentTrip.waypoints]
+      .filter((wp) => !this.rideVisitedWaypoints.has(wp.id))
+      .sort((a, b) => a.order - b.order);
+  },
+
   onRidePosition(pos) {
     if (!this.isRiding || !this.currentTrip?.route?.coordinates || !this.currentTrip.route._cumulative) return;
     const coords = this.currentTrip.route.coordinates;
     const cumulative = this.currentTrip.route._cumulative;
     const total = this.currentTrip.route._total || cumulative[cumulative.length - 1] || 0;
+
+    this.markVisitedWaypoints(pos);
+
+    const remainingWaypoints = this.getRemainingWaypoints();
+    const stopsEl = document.getElementById('rideStops');
+    if (stopsEl) {
+      stopsEl.textContent = remainingWaypoints.length.toString();
+    }
 
     // Find nearest segment point
     let nearestIdx = 0;
@@ -244,6 +288,25 @@ const App = {
         bestDist = d;
         nearestIdx = i;
       }
+    }
+
+    const baseThreshold = 50; // meters for typical GPS noise
+    const dynamicThreshold = Math.max(baseThreshold, (pos.accuracy || 30) * 1.6);
+    const offRouteThreshold = dynamicThreshold;
+    const now = Date.now();
+    if (bestDist > offRouteThreshold) {
+      this.offRouteCounter = (this.offRouteCounter || 0) + 1;
+    } else {
+      this.offRouteCounter = 0;
+    }
+
+    const requiredSamples = 4; // demand 4 consecutive off-route samples to avoid noise
+    const canReroute = bestDist > offRouteThreshold && this.offRouteCounter >= requiredSamples && !this.rideRerouting && (now - (this.lastRerouteAt || 0) > 45000);
+    if (canReroute) {
+      this.rideRerouting = true;
+      this.lastRerouteAt = now;
+      UI.showToast('Off route. Rerouting...', 'info');
+      MapManager.rerouteFromPosition(pos, remainingWaypoints);
     }
 
     const remaining = Math.max(0, total - cumulative[nearestIdx]);
@@ -902,6 +965,10 @@ const App = {
     if (!this.currentTrip) return;
     
     this.currentTrip.route = routeData;
+    this.precomputeRouteMetrics();
+    this.prefetchTiles();
+    this.rideRerouting = false;
+    this.offRouteCounter = 0;
     
     // Save route coordinates as custom points
     if (routeData.coordinates) {
