@@ -1,118 +1,89 @@
 # Ride Trip Planner
 
-A stripped-down Progressive Web App for planning trips with waypoints, custom routes, and a travel journal.
+Trip planning and sharing built on Cloudflare Pages + Workers. The frontend lives in `public/` and the authenticated API lives under `api/` with D1 for data, KV for sessions, and R2 for attachments.
 
-## Features
+## Features (current)
 
-- 📱 **Fullscreen Navigation Mode** - Designed for mobile use with PWA support
-- 📍 **Waypoint Planning** - Add, reorder, and categorize waypoints (scenic, fuel, food, lodging, etc.)
-- 🗺️ **Route Customization** - Drag routes to adjust paths, automatic routing between waypoints
-- 📝 **Trip Journal** - Add notes with public/private visibility for sharing
-- 🔗 **Easy Sharing** - Generate shareable links, export to JSON/GPX, easy collaboration
-- 📴 **Offline Support** - Works offline with cached map tiles
+- SSO login (Google, Facebook, Microsoft) with sessions in KV
+- Authenticated trips with waypoints, journal entries, attachments (R2), and cover images
+- Public sharing via 6-char short codes; “Use this trip” import flow into your account
+- Export to JSON/GPX; import resumes after login if started from a shared link
+- Refresh controls for trips, journal, and waypoints to bust cache in UI
+- About/legal pages (privacy, terms, deletion) and self-service data purge page with auth + confirmation
 
-## Getting Started
-
-### Running Locally
-
-1. Install a local server (e.g., using npm):
-   ```bash
-   npm install
-   npm start
-   ```
-
-2. Open http://localhost:3000 in your browser
-
-3. On mobile, use "Add to Home Screen" for the full PWA experience
-
-### Development
-
-The app is built with vanilla JavaScript and uses:
-- **Leaflet.js** - Map display and interaction
-- **Leaflet Routing Machine** - Route calculation and display
-- **localStorage** - Trip data persistence
-
-### Project Structure
+## Project Structure
 
 ```
-Ride/
-├── index.html          # Main app shell
-├── view.html           # Public trip viewer
-├── manifest.json       # PWA manifest
-├── sw.js              # Service worker for offline support
-├── css/
-│   └── app.css        # All styles
-├── js/
-│   ├── storage.js     # LocalStorage wrapper
-│   ├── trip.js        # Trip data model
-│   ├── map.js         # Leaflet map management
-│   ├── ui.js          # DOM interactions
-│   ├── share.js       # Sharing functionality
-│   └── app.js         # Main app orchestration
-└── icons/
-    └── icon.svg       # App icon
+api/
+  auth.js       # OAuth handlers and session lifecycle
+  router.js     # Minimal router
+  trips.js      # Trips, waypoints, journal, attachments, sharing, purge
+  utils.js      # CORS, auth middleware, helpers
+  worker.js     # Entry point wiring routes
+  schema.sql    # D1 schema
+public/
+  index.html    # Main app shell (authenticated)
+  trip.html     # Public/shared trip view + import
+  view.html     # Legacy viewer
+  deletion.html # Self-serve purge with re-auth + DELETE confirmation
+  privacy.html, terms.html, admin.html, etc.
+  css/          # app.css, global.css
+  js/           # api.js client, app.js, map.js, ui.js, storage.js, share.js, trip.js
+docs/
+  osrm-azure.md
+scripts/
+  regen-share.js
+wrangler.toml     # Cloudflare Pages/Workers config
+DEPLOY.md         # Deployment guide (D1/KV/R2/OAuth setup)
 ```
 
-## Usage
+## Local Development
 
-### Creating a Trip
+Requirements: Node 18+, Wrangler CLI, Cloudflare account.
 
-1. Tap the **+Add** button in the Waypoints panel
-2. Tap on the map to set the location
-3. Enter waypoint details and save
-4. Add more waypoints to create a route
-
-### Adding Journal Notes
-
-1. Go to the **Journal** tab
-2. Tap **+ Note** to add an entry
-3. Check "Private note" to exclude from sharing
-
-### Sharing a Trip
-
-1. Tap the share icon in the top bar
-2. Copy the shareable link
-3. Use "Share via..." for native sharing
-4. Export as JSON or GPX for other apps
-
-### Integration with Notes Apps
-
-The share link can be embedded in any notes app:
-
-```markdown
-[My Road Trip](https://your-domain.com/?trip=abc123)
+1) Install deps:
+```bash
+npm install
 ```
 
-Private notes stay private - only public entries are visible to others.
+2) Configure Cloudflare bindings (see `DEPLOY.md` for details):
+- D1 database bound as `DB`
+- KV namespace bound as `SESSIONS`
+- R2 bucket bound as `ATTACHMENTS`
+- OAuth secrets: GOOGLE_CLIENT_ID/SECRET, FACEBOOK_APP_ID/SECRET, MICROSOFT_CLIENT_ID/SECRET
 
-## Customization
-
-### Map Tiles
-
-To use a different map provider, edit `js/map.js`:
-
-```javascript
-L.tileLayer('YOUR_TILE_URL/{z}/{x}/{y}.png', {
-  attribution: 'Your attribution'
-}).addTo(this.map);
+3) Run migrations:
+```bash
+npm run db:migrate      # uses api/schema.sql
 ```
 
-### Waypoint Types
-
-Add custom waypoint types in `js/map.js`:
-
-```javascript
-waypointIcons: {
-  // Add your custom type
-  camping: { color: '#22c55e', icon: '⛺' }
-}
+4) Develop against Cloudflare stack:
+```bash
+npm run dev:remote      # pages dev with D1, KV bindings
 ```
 
-## Browser Support
+Static-only preview (no API):
+```bash
+npm start               # serves public/ at http://localhost:3000
+```
 
-- Chrome/Edge (Desktop & Mobile)
-- Safari (iOS 11.3+)
-- Firefox
+## API Notes
+
+- Auth routes: `/api/auth/login/:provider`, `/api/auth/callback/:provider`, `/api/auth/me`, `/api/auth/logout`
+- Trip data: `/api/trips` (CRUD), `/api/trips/:id/waypoints`, `/api/trips/:id/journal`, `/api/trips/:id/attachments`
+- Sharing: `/api/trips/:id/share` generates/returns short code; public fetch `/api/s/:shortCode`
+- Attachments stream from R2 via `/api/attachments/:id`
+- Self-serve purge: `POST /api/user/purge` deletes user trips/waypoints/journal/attachments and R2 objects
+
+## Frontend Notes
+
+- About modal links: privacy/terms/deletion plus repo link (Source)
+- Deletion page requires login, typing `DELETE`, and confirmation before purge
+- Import flow on shared trip page prompts login, then creates a copy into your account
+
+## Deployment
+
+See `DEPLOY.md` for Cloudflare Pages/Workers steps (create D1, KV, R2, add secrets, `npm run deploy`).
 
 ## License
 
