@@ -6,6 +6,7 @@ const App = {
   currentUser: null,
   isOnline: true,
   useCloud: false, // Will be true when deployed to Cloudflare
+  loginPromptShown: false,
 
   /**
    * Initialize the application
@@ -24,6 +25,8 @@ const App = {
     
     // Try to authenticate if cloud is available
     await this.checkAuth();
+    this.configureLoginLinks();
+    this.showLoginPromptIfNeeded();
     
     // Bind user button
     this.bindUserButton();
@@ -63,11 +66,33 @@ const App = {
         this.currentUser = user;
         this.useCloud = true;
         this.updateUserUI();
+        UI.closeModal('loginModal');
       }
     } catch (error) {
       // Not authenticated or API not available - use local storage
       console.log('Using local storage mode');
       this.useCloud = false;
+    }
+  },
+
+  /**
+   * Wire login buttons with return URL
+   */
+  configureLoginLinks() {
+    const returnTo = window.location.href;
+    document.querySelectorAll('[data-login-provider]').forEach((el) => {
+      const provider = el.dataset.loginProvider;
+      el.href = API.auth.loginUrl(provider, returnTo);
+    });
+  },
+
+  /**
+   * Prompt login on landing if not authenticated
+   */
+  showLoginPromptIfNeeded() {
+    if (!this.currentUser && !this.loginPromptShown) {
+      UI.openModal('loginModal');
+      this.loginPromptShown = true;
     }
   },
 

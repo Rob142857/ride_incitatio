@@ -1,0 +1,10 @@
+.git/
+.wrangler/
+api/
+wrangler.toml
+.wrangler-worker.toml
+.wrangler-empty.toml
+package.json
+README.md
+DEPLOY.md
+_routes.json

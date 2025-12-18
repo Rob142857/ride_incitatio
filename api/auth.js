@@ -179,10 +179,16 @@ export const AuthHandler = {
     
     const userData = await userResponse.json();
     const parsedUser = provider.parseUser(userData);
+    if (!parsedUser?.email) {
+      console.error('OAuth user missing email', providerName, userData);
+      return Response.redirect(`/?error=no_email`, 302);
+    }
+    const normalizedEmail = parsedUser.email.toLowerCase();
     
     // Create or update user in D1
     const user = await createOrUpdateUser(env.DB, {
       ...parsedUser,
+      email: normalizedEmail,
       provider: providerName
     });
     
@@ -233,6 +239,7 @@ export const AuthHandler = {
  */
 async function createOrUpdateUser(db, userData) {
   const { email, name, avatar_url, provider, provider_id } = userData;
+  const normalizedEmail = email?.toLowerCase();
   
   // Check if user exists
   const existing = await db.prepare(
@@ -243,16 +250,16 @@ async function createOrUpdateUser(db, userData) {
     // Update existing user
     await db.prepare(
       'UPDATE users SET email = ?, name = ?, avatar_url = ?, updated_at = datetime("now") WHERE id = ?'
-    ).bind(email, name, avatar_url, existing.id).run();
+    ).bind(normalizedEmail, name, avatar_url, existing.id).run();
     
-    return { ...existing, email, name, avatar_url };
+    return { ...existing, email: normalizedEmail, name, avatar_url };
   }
   
   // Create new user
   const id = generateId();
   await db.prepare(
     'INSERT INTO users (id, email, name, avatar_url, provider, provider_id) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(id, email, name, avatar_url, provider, provider_id).run();
+  ).bind(id, normalizedEmail, name, avatar_url, provider, provider_id).run();
   
-  return { id, email, name, avatar_url, provider, provider_id };
+  return { id, email: normalizedEmail, name, avatar_url, provider, provider_id };
 }

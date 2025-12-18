@@ -49,8 +49,9 @@ const API = {
       }
     },
     
-    loginUrl(provider) {
-      return `${API.baseUrl}/auth/login/${provider}`;
+    loginUrl(provider, returnTo) {
+      const suffix = returnTo ? `?return=${encodeURIComponent(returnTo)}` : '';
+      return `${API.baseUrl}/auth/login/${provider}${suffix}`;
     },
     
     async logout() {
