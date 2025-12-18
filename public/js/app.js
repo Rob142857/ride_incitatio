@@ -243,7 +243,16 @@ const App = {
     if (this.useCloud && this.currentUser) {
       // Load from cloud
       try {
-        const trips = await API.trips.list();
+        let trips = await API.trips.list();
+
+        // If cloud is empty but local has data, migrate once
+        if (trips.length === 0) {
+          const migrated = await this.migrateLocalTripsToCloud();
+          if (migrated > 0) {
+            trips = await API.trips.list();
+          }
+        }
+
         if (trips.length > 0) {
           const trip = await API.trips.get(trips[0].id);
           this.loadTripData(trip);
@@ -272,6 +281,72 @@ const App = {
       }
     }
     this.createNewTrip();
+  },
+
+  /**
+   * One-time migration: if user just logged in and cloud is empty but local has trips,
+   * push local trips to the cloud account.
+   */
+  async migrateLocalTripsToCloud() {
+    const localTrips = Storage.getTrips();
+    if (!localTrips.length) return 0;
+
+    let cloudTrips = [];
+    try {
+      cloudTrips = await API.trips.list();
+    } catch (err) {
+      console.error('Cannot read cloud trips during migration', err);
+      return 0;
+    }
+
+    if (cloudTrips.length > 0) return 0; // Already has cloud data; skip to avoid duplicates
+
+    let migrated = 0;
+    for (const local of localTrips) {
+      try {
+        const cloudTrip = await API.trips.create({
+          name: local.name || 'Trip',
+          description: local.description || ''
+        });
+
+        // Waypoints
+        const waypoints = Array.isArray(local.waypoints) ? local.waypoints : [];
+        for (const wp of waypoints) {
+          await API.waypoints.add(cloudTrip.id, {
+            name: wp.name,
+            address: wp.address,
+            lat: wp.lat,
+            lng: wp.lng,
+            type: wp.type,
+            notes: wp.notes,
+            sort_order: wp.order ?? wp.sort_order ?? 0
+          });
+        }
+
+        // Journal entries
+        const journal = Array.isArray(local.journal) ? local.journal : [];
+        for (const entry of journal) {
+          await API.journal.add(cloudTrip.id, {
+            title: entry.title,
+            content: entry.content,
+            is_private: entry.isPrivate,
+            tags: entry.tags,
+            location: entry.location,
+            waypoint_id: entry.waypointId || null
+          });
+        }
+
+        migrated++;
+      } catch (err) {
+        console.error('Failed to migrate a local trip', err);
+      }
+    }
+
+    if (migrated > 0) {
+      UI.showToast(`Synced ${migrated} local trip(s) to your account`, 'success');
+    }
+
+    return migrated;
   },
 
   /**
