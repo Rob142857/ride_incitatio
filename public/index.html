@@ -125,40 +125,42 @@
 
     <!-- Ride Overlay -->
     <section id="rideOverlay" class="ride-overlay hidden">
-      <div class="ride-top">
-        <div class="ride-title-group">
-          <div class="ride-pill">Riding</div>
-          <div class="ride-trip-name" id="rideTripName">Ride</div>
-        </div>
-        <div class="ride-actions">
-          <button id="rideRecenterBtn" class="ride-icon-btn" aria-label="Recenter">
-            <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 3h-1.07a6.002 6.002 0 00-5.93-5.93V4h-2v1.07A6.002 6.002 0 004.07 11H3v2h1.07a6.002 6.002 0 005.93 5.93V20h2v-1.07a6.002 6.002 0 005.93-5.93H20v-2z"/></svg>
-          </button>
-          <button id="rideExitBtn" class="ride-icon-btn" aria-label="Exit ride">
-            <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="none"/><path d="M10 8l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 12H6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="ride-banner">
-        <div class="ride-next-label">Next</div>
+      <!-- Compact top banner: next turn only -->
+      <div class="ride-banner-minimal">
         <div class="ride-next-main" id="rideNextInstruction">Ready to ride</div>
         <div class="ride-next-meta" id="rideNextMeta">Waiting for GPS...</div>
       </div>
-      <div class="ride-stats">
-        <div class="ride-stat">
-          <div class="ride-stat-label">Remaining</div>
-          <div class="ride-stat-value" id="rideDistanceRemaining">—</div>
+
+      <!-- Collapsible stats panel (hidden by default) -->
+      <div id="rideStatsPanel" class="ride-stats-panel hidden">
+        <div class="ride-stats-row">
+          <div class="ride-stat-mini"><span class="ride-stat-label">Remaining</span><span class="ride-stat-value" id="rideDistanceRemaining">—</span></div>
+          <div class="ride-stat-mini"><span class="ride-stat-label">Stops</span><span class="ride-stat-value" id="rideStops">—</span></div>
+          <div class="ride-stat-mini"><span class="ride-stat-label">ETA</span><span class="ride-stat-value" id="rideEta">—</span></div>
         </div>
-        <div class="ride-stat">
-          <div class="ride-stat-label">Stops</div>
-          <div class="ride-stat-value" id="rideStops">—</div>
-        </div>
-        <div class="ride-stat">
-          <div class="ride-stat-label">ETA</div>
-          <div class="ride-stat-value" id="rideEta">—</div>
+        <div class="ride-stats-row">
+          <div class="ride-stat-mini full"><span class="ride-stat-label">Trip</span><span class="ride-stat-value" id="rideTripName">Ride</span></div>
         </div>
       </div>
+
+      <!-- Bottom-right floating action buttons -->
+      <div class="ride-fab-group">
+        <button id="rideInfoBtn" class="ride-fab" aria-label="Trip info">ℹ️</button>
+        <button id="rideAddBtn" class="ride-fab" aria-label="Add note or photo">➕</button>
+        <button id="rideRecenterBtn" class="ride-fab" aria-label="Recenter">📍</button>
+        <button id="rideExitBtn" class="ride-fab ride-fab-exit" aria-label="Exit ride">✕</button>
+      </div>
     </section>
+
+    <!-- Ride add action sheet -->
+    <div id="rideAddSheet" class="ride-action-sheet hidden">
+      <div class="ride-action-sheet-content">
+        <button id="rideAddNoteBtn" class="ride-action-btn">📝 Add Note</button>
+        <button id="rideAddPhotoBtn" class="ride-action-btn">📷 Take Photo</button>
+        <button id="rideAddSheetClose" class="ride-action-btn cancel">Cancel</button>
+      </div>
+    </div>
+    <input type="file" id="ridePhotoInput" accept="image/*" capture="environment" class="hidden">
     
     <!-- Panels -->
     <section id="waypointsPanel" class="panel hidden">

@@ -243,6 +243,65 @@ const App = {
 
   bindEvents() {
     this.bindJournalAttachmentPicker();
+    this.bindRideControls();
+  },
+
+  bindRideControls() {
+    // Info button toggles stats panel
+    document.getElementById('rideInfoBtn')?.addEventListener('click', () => {
+      document.getElementById('rideStatsPanel')?.classList.toggle('hidden');
+    });
+
+    // Add button opens action sheet
+    document.getElementById('rideAddBtn')?.addEventListener('click', () => {
+      document.getElementById('rideAddSheet')?.classList.remove('hidden');
+    });
+
+    // Close action sheet
+    document.getElementById('rideAddSheetClose')?.addEventListener('click', () => {
+      document.getElementById('rideAddSheet')?.classList.add('hidden');
+    });
+
+    // Add note from ride mode
+    document.getElementById('rideAddNoteBtn')?.addEventListener('click', () => {
+      document.getElementById('rideAddSheet')?.classList.add('hidden');
+      UI.openModal('noteModal');
+    });
+
+    // Take photo from ride mode
+    document.getElementById('rideAddPhotoBtn')?.addEventListener('click', () => {
+      document.getElementById('rideAddSheet')?.classList.add('hidden');
+      document.getElementById('ridePhotoInput')?.click();
+    });
+
+    // Handle photo capture
+    document.getElementById('ridePhotoInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file || !this.currentTrip) return;
+      if (!this.useCloud || !this.currentUser) {
+        UI.showToast('Login to save photos.', 'error');
+        return;
+      }
+      try {
+        UI.showToast('Uploading photo...', 'info');
+        await API.attachments.upload(this.currentTrip.id, file, {});
+        UI.showToast('Photo saved to trip', 'success');
+      } catch (err) {
+        console.error('Photo upload failed', err);
+        UI.showToast('Photo upload failed', 'error');
+      }
+      e.target.value = '';
+    });
+
+    // Recenter button
+    document.getElementById('rideRecenterBtn')?.addEventListener('click', () => {
+      MapManager.recenterRide();
+    });
+
+    // Exit button
+    document.getElementById('rideExitBtn')?.addEventListener('click', () => {
+      this.exitRideMode();
+    });
   },
 
   formatDistance(meters) {
@@ -410,7 +469,11 @@ const App = {
     const nextStep = steps.find((s) => s.index >= nearestIdx) || steps[steps.length - 1];
     if (nextStep) {
       document.getElementById('rideNextInstruction').textContent = nextStep.text || 'Continue';
-      document.getElementById('rideNextMeta').textContent = `${this.formatDistance(nextStep.distance || 0)} ahead`;
+      // Calculate distance from current position to the start of the next step
+      const distToNextStep = nextStep.index > nearestIdx
+        ? cumulative[nextStep.index] - cumulative[nearestIdx]
+        : bestDist; // Already at/past this step, show distance to nearest point
+      document.getElementById('rideNextMeta').textContent = `${this.formatDistance(distToNextStep)} ahead`;
     } else {
       document.getElementById('rideNextInstruction').textContent = 'Finish';
       document.getElementById('rideNextMeta').textContent = 'Approaching destination';

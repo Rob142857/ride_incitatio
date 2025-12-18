@@ -155,14 +155,7 @@ const UI = {
       App.enterRideMode();
     });
 
-    // Ride overlay controls
-    document.getElementById('rideExitBtn').addEventListener('click', () => {
-      App.exitRideMode();
-    });
-
-    document.getElementById('rideRecenterBtn').addEventListener('click', () => {
-      MapManager.recenterRide();
-    });
+    // Ride overlay controls moved to App.bindRideControls()
   },
 
   /**
