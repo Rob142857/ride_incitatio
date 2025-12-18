@@ -695,6 +695,82 @@
       object-fit: contain;
     }
     
+
+    /* Login modal (shared styling with main app) */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-content.login-modal {
+      background: #0f1117;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      width: min(420px, 90vw);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-content .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .modal-content .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .login-buttons {
+      display: grid;
+      gap: 10px;
+      margin: 16px 0 10px;
+    }
+
+    .login-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #161b27;
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      background: #1c2231;
+    }
+
+    .login-btn svg {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .login-note {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
     /* Empty States */
     .empty-state {
       text-align: center;
@@ -869,6 +945,32 @@
       </svg>
     </button>
     <img id="lightbox-image" class="lightbox-image" src="" alt="">
+  </div>
+
+  <!-- Login Modal (reused flow from main app) -->
+  <div id="loginModal" class="modal hidden">
+    <div class="modal-content login-modal">
+      <div class="modal-header">
+        <h3>Welcome to Ride</h3>
+        <button type="button" class="modal-close" data-close-login aria-label="Close">×</button>
+      </div>
+      <p class="modal-subtitle">Sign in to save trips, sync across devices, and share clean links.</p>
+      <div class="login-buttons">
+        <a class="login-btn" data-login-provider="google" id="loginBtnGoogle">
+          <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </a>
+        <a class="login-btn" data-login-provider="facebook" id="loginBtnFacebook">
+          <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/></svg>
+          Continue with Facebook
+        </a>
+        <a class="login-btn" data-login-provider="microsoft" id="loginBtnMicrosoft">
+          <svg viewBox="0 0 24 24"><path d="M11.4 11.4H0V0h11.4v11.4z" fill="#F25022"/><path d="M24 11.4H12.6V0H24v11.4z" fill="#7FBA00"/><path d="M11.4 24H0V12.6h11.4V24z" fill="#00A4EF"/><path d="M24 24H12.6V12.6H24V24z" fill="#FFB900"/></svg>
+          Continue with Microsoft
+        </a>
+      </div>
+      <p class="login-note">We only access your email and name for account creation. Your trip data stays private.</p>
+    </div>
   </div>
   
   <!-- Leaflet JS -->
@@ -1248,6 +1350,20 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeLightbox();
     });
+
+    // Login modal events
+    document.querySelectorAll('[data-close-login]').forEach((btn) => {
+      btn.addEventListener('click', closeLoginModal);
+    });
+
+    const loginModalEl = document.getElementById('loginModal');
+    if (loginModalEl) {
+      loginModalEl.addEventListener('click', (e) => {
+        if (e.target.id === 'loginModal') {
+          closeLoginModal();
+        }
+      });
+    }
     
     // Load trip on page load
     // Support both /trip.html?trip=abc123 and /abc123 (via worker redirect)
@@ -1320,6 +1436,30 @@
       };
     }
 
+    function setLoginLinks() {
+      const returnTo = window.location.href;
+      const providers = ['google', 'facebook', 'microsoft'];
+      providers.forEach((p) => {
+        const el = document.getElementById(`loginBtn${p.charAt(0).toUpperCase() + p.slice(1)}`);
+        if (el) el.href = API.auth.loginUrl(p, returnTo);
+      });
+    }
+
+    function openLoginModal() {
+      setLoginLinks();
+      const modal = document.getElementById('loginModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById('loginModal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
     async function ensureUserOrPrompt() {
       try {
         const user = await API.auth.getUser();
@@ -1328,15 +1468,11 @@
         console.error('Auth check failed:', err);
       }
 
-      const confirmLogin = window.confirm('Sign in to save this trip to your account?');
-      if (!confirmLogin) return null;
-
       if (shortCode) {
         localStorage.setItem(pendingImportKey, shortCode);
       }
 
-      const returnTo = window.location.href;
-      window.location.href = API.auth.loginUrl('google', returnTo);
+      openLoginModal();
       return null;
     }
 
