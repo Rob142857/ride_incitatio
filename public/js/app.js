@@ -888,7 +888,19 @@ const App = {
 
       updatedTrip = this.normalizeTrip(updatedTrip);
 
-      this.loadTripDataIfCurrent(updatedTrip);
+      if (this.currentTrip?.id === updatedTrip.id) {
+        this.currentTrip = { ...this.currentTrip, ...updatedTrip };
+        this.loadTripData(this.currentTrip);
+      }
+
+      // Refresh cached list entry optimistically
+      if (Array.isArray(this.tripListCache) && this.tripListCache.length) {
+        this.tripListCache = this.tripListCache.map((t) => t.id === updatedTrip.id ? { ...t, ...updatedTrip } : t);
+        UI.renderTrips(this.tripListCache, this.currentTrip?.id || updatedTrip.id);
+      } else {
+        this.refreshTripsList();
+      }
+
       this.refreshTripsList();
       this.fillTripDetailsForm(updatedTrip);
       if (coverFileInput) {
