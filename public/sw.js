@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ride-v1';
+const CACHE_NAME = 'ride-v2-2025-12-19';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
