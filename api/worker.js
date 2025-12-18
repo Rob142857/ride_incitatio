@@ -7,6 +7,7 @@
 import { Router } from './router.js';
 import { AuthHandler } from './auth.js';
 import { TripsHandler } from './trips.js';
+import { PlacesHandler } from './places.js';
 import { cors, jsonResponse, errorResponse, requireAuth, optionalAuth, BASE_URL } from './utils.js';
 
 const router = new Router();
@@ -34,6 +35,9 @@ router.post('/api/trips/:tripId/waypoints', requireAuth, TripsHandler.addWaypoin
 router.put('/api/trips/:tripId/waypoints/:id', requireAuth, TripsHandler.updateWaypoint);
 router.delete('/api/trips/:tripId/waypoints/:id', requireAuth, TripsHandler.deleteWaypoint);
 router.put('/api/trips/:tripId/waypoints/reorder', requireAuth, TripsHandler.reorderWaypoints);
+
+// Places search (protected to limit API key exposure)
+router.get('/api/places/search', requireAuth, PlacesHandler.search);
 
 // Journal routes (protected)
 router.post('/api/trips/:tripId/journal', requireAuth, TripsHandler.addJournalEntry);

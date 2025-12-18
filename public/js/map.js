@@ -7,6 +7,7 @@ const MapManager = {
   waypointMarkers: {},
   isAddingWaypoint: false,
   pendingLocation: null,
+  tempMarker: null,
   rideWatchId: null,
   rideMarker: null,
   rideHeading: null,
@@ -326,6 +327,21 @@ const MapManager = {
     if (this.tempMarker) {
       this.map.removeLayer(this.tempMarker);
       this.tempMarker = null;
+    }
+  },
+
+  /**
+   * Show or move a temporary marker for previews (e.g., search results)
+   */
+  showTempLocation(lat, lng) {
+    if (!this.map) return;
+    const latlng = L.latLng(lat, lng);
+    if (this.tempMarker) {
+      this.tempMarker.setLatLng(latlng);
+    } else {
+      this.tempMarker = L.marker(latlng, {
+        icon: this.createIcon('custom')
+      }).addTo(this.map);
     }
   },
 

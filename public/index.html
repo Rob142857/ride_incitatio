@@ -230,6 +230,10 @@
         <form id="waypointForm">
           <input type="text" id="waypointName" placeholder="Waypoint name">
           <input type="text" id="waypointAddress" placeholder="Address or tap map">
+          <div class="field-row place-search-row">
+            <button type="button" class="secondary-btn" id="searchPlaceBtn">Search Google Maps</button>
+            <span class="microcopy">Find a business or landmark, then use it for the waypoint.</span>
+          </div>
           <div class="coord-inputs">
             <input type="number" id="waypointLat" placeholder="Latitude" step="any">
             <input type="number" id="waypointLng" placeholder="Longitude" step="any">
@@ -248,6 +252,25 @@
             <button type="submit" class="primary-btn">Save</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="placeSearchModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Search Google Maps</h3>
+          <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+        </div>
+        <p class="modal-subtitle">Look up businesses or landmarks, then use them for a waypoint.</p>
+        <div class="field-row">
+          <input type="text" id="placeSearchInput" placeholder="E.g. cafe, museum, fuel station">
+        </div>
+        <div class="place-search-actions">
+          <button type="button" class="secondary-btn" id="placeUseCurrentLocation">Use current location</button>
+          <button type="button" class="primary-btn" id="placeSearchSubmit">Search</button>
+        </div>
+        <div id="placeSearchStatus" class="microcopy">Type a search to begin.</div>
+        <div id="placeSearchResults" class="place-results"></div>
       </div>
     </div>
     

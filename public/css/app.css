@@ -1321,6 +1321,13 @@ body.ride-mode {
   pointer-events: auto;
 }
 
+/* Keep the map sharp while choosing a waypoint */
+.map-pick-mode #waypointModal {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+}
+
 .modal-content {
   background: var(--bg-modal);
   border-radius: 16px;
@@ -1345,6 +1352,70 @@ body.ride-mode {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   border-radius: 16px 16px 0 0;
   pointer-events: none;
+}
+
+.place-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.place-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 8px 0 10px;
+}
+
+.place-results {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.place-result {
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.place-result-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.place-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.place-rating {
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.place-address {
+  margin: 4px 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* About Modal - elegant archive style */

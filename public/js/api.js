@@ -197,6 +197,21 @@ const API = {
       return `${API.baseUrl}/attachments/${attachmentId}`;
     }
   },
+
+  // Places search (Google Places proxy)
+  places: {
+    async search(query, options = {}) {
+      const params = new URLSearchParams({ q: query });
+      if (options.lat && options.lng) {
+        params.set('lat', options.lat);
+        params.set('lng', options.lng);
+      }
+      if (options.radius) params.set('radius', options.radius);
+      if (options.region) params.set('region', options.region);
+      const data = await API.request(`/places/search?${params.toString()}`);
+      return data.results;
+    }
+  },
   
   // Shared trip (public) - uses short code at root
   shared: {
