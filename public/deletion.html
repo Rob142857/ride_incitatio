@@ -22,6 +22,40 @@
       padding: 24px;
       box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
     }
+    .danger-box {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #ef4444;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .danger-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: 1px solid #ef4444;
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+    .danger-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .danger-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 0.95rem;
+    }
+    .status.success { color: #34d399; }
+    .status.error { color: #f87171; }
     h1 { margin-bottom: 12px; letter-spacing: 0.01em; }
     h2 { margin-top: 24px; margin-bottom: 12px; }
     a { color: #a5b4fc; }
@@ -36,6 +70,12 @@
   <h2>Request Deletion</h2>
   <p>Email us at <strong>support@ride.incitat.io</strong> from the email address used for your Ride account. Include the subject line “Ride Data Deletion Request.”</p>
   <p>We will verify ownership and delete your data within 30 days, usually much sooner.</p>
+
+  <div class="danger-box">
+    <p>You can also delete everything yourself right now (trips, waypoints, notes, attachments). This only works when you are signed in.</p>
+    <button id="deleteDataBtn" class="danger-btn" type="button">Delete my Ride data</button>
+    <p id="deleteStatus" class="status" aria-live="polite"></p>
+  </div>
 
   <h2>What Gets Deleted</h2>
   <ul>
@@ -52,5 +92,54 @@
 
     <p>If you have questions, contact <strong>support@ride.incitat.io</strong>.</p>
   </div>
+  <script>
+    (function() {
+      const btn = document.getElementById('deleteDataBtn');
+      const status = document.getElementById('deleteStatus');
+
+      function setStatus(message, tone) {
+        status.textContent = message;
+        status.className = `status ${tone || ''}`.trim();
+      }
+
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          const confirmDelete = window.confirm('Delete all your trips, waypoints, notes, and attachments? This cannot be undone.');
+          if (!confirmDelete) return;
+
+          btn.disabled = true;
+          btn.textContent = 'Deleting...';
+          setStatus('Working on it...', '');
+
+          try {
+            const response = await fetch('/api/user/purge', {
+              method: 'POST',
+              credentials: 'include',
+              cache: 'no-store'
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(data.error || 'Could not delete data.');
+            }
+
+            const count = typeof data.deleted_objects === 'number' ? data.deleted_objects : null;
+            const summary = count !== null ? `Deleted ${count} attachment file(s) and all related trip data.` : 'Deleted your trips, waypoints, notes, and attachments.';
+            setStatus(summary, 'success');
+            btn.textContent = 'Deleted';
+          } catch (err) {
+            const message = err?.message || 'Something went wrong.';
+            if (message.toLowerCase().includes('unauthorized')) {
+              setStatus('Please sign in first, then return to delete your data.', 'error');
+            } else {
+              setStatus(message, 'error');
+            }
+            btn.disabled = false;
+            btn.textContent = 'Delete my Ride data';
+          }
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

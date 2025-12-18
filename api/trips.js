@@ -876,5 +876,32 @@ export const TripsHandler = {
     }
     
     return jsonResponse({ success: true });
+  },
+
+  /**
+   * Delete all user-owned trips and related data (waypoints, journal, attachments, route data).
+   * Also removes attachment binaries from R2 before wiping DB rows.
+   */
+  async deleteAllUserData(context) {
+    const { env, user } = context;
+
+    // Collect attachment storage keys for this user's trips
+    const attachments = await env.DB.prepare(
+      'SELECT a.storage_key FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE t.user_id = ?'
+    ).bind(user.id).all();
+
+    // Best-effort R2 cleanup; continue even if some objects are missing
+    for (const row of attachments.results || []) {
+      try {
+        await env.ATTACHMENTS.delete(row.storage_key);
+      } catch (err) {
+        console.error('R2 delete failed', row.storage_key, err);
+      }
+    }
+
+    // Remove all trips (cascades to waypoints, journal, attachments, route_data, short_urls)
+    await env.DB.prepare('DELETE FROM trips WHERE user_id = ?').bind(user.id).run();
+
+    return jsonResponse({ success: true, deleted_objects: attachments.results?.length || 0 });
   }
 };

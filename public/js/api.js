@@ -204,6 +204,13 @@ const API = {
       const data = await API.request(`/s/${shortCode}`);
       return data.trip;
     }
+  },
+
+  // Account/data
+  account: {
+    async purge() {
+      return API.request('/user/purge', { method: 'POST' });
+    }
   }
 };
 

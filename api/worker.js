@@ -46,6 +46,9 @@ router.get('/api/attachments/:id', optionalAuth, TripsHandler.getAttachment);
 router.put('/api/attachments/:id', requireAuth, TripsHandler.updateAttachment);
 router.delete('/api/attachments/:id', requireAuth, TripsHandler.deleteAttachment);
 
+// Account/data routes
+router.post('/api/user/purge', requireAuth, TripsHandler.deleteAllUserData);
+
 // Share routes 
 router.post('/api/trips/:id/share', requireAuth, TripsHandler.generateShareLink);
 
