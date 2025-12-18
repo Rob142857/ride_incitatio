@@ -498,7 +498,9 @@ const UI = {
       journal: Array.isArray(trip.journal) ? trip.journal : [],
     }));
 
-    normalizedTrips.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0)).forEach(trip => {
+    const total = normalizedTrips.length;
+
+    normalizedTrips.forEach((trip, index) => {
       const stats = Trip.getStats(trip);
       const waypointCount = Number.isFinite(trip.waypoint_count) ? trip.waypoint_count : stats.waypointCount;
       const journalCount = Number.isFinite(trip.journal_count) ? trip.journal_count : stats.journalCount;
@@ -547,6 +549,23 @@ const UI = {
       if (detailsBtn) {
         detailsBtn.onclick = (e) => { e.stopPropagation(); App.openTripDetails(trip.id); };
       }
+
+      const deleteBtn = node.querySelector('.trip-delete-btn');
+      if (deleteBtn) {
+        deleteBtn.onclick = (e) => { e.stopPropagation(); this.showDeleteTripConfirm(trip); };
+      }
+
+      const moveUp = node.querySelector('.trip-move-up');
+      const moveDown = node.querySelector('.trip-move-down');
+      if (moveUp) {
+        moveUp.disabled = index === 0;
+        moveUp.onclick = (e) => { e.stopPropagation(); this.requestTripReorder(trip.id, 'up'); };
+      }
+      if (moveDown) {
+        moveDown.disabled = index === total - 1;
+        moveDown.onclick = (e) => { e.stopPropagation(); this.requestTripReorder(trip.id, 'down'); };
+      }
+
       item.addEventListener('click', () => App.loadTrip(trip.id));
       item.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -556,6 +575,18 @@ const UI = {
       });
       container.appendChild(node);
     });
+  },
+
+  showDeleteTripConfirm(trip) {
+    const name = trip.name || 'this trip';
+    const ok = window.confirm(`Delete ${name}? This cannot be undone.`);
+    if (ok) {
+      App.deleteTrip(trip.id);
+    }
+  },
+
+  requestTripReorder(tripId, direction) {
+    App.reorderTrips(tripId, direction);
   },
 
   /**

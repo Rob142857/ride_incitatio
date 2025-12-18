@@ -5,7 +5,8 @@ const Storage = {
   KEYS: {
     TRIPS: 'ride_trips',
     CURRENT_TRIP: 'ride_current_trip',
-    SETTINGS: 'ride_settings'
+    SETTINGS: 'ride_settings',
+    TRIP_ORDER: 'ride_trip_order'
   },
 
   /**
@@ -157,9 +158,24 @@ const Storage = {
     return true;
   },
 
+  /**
+   * Get trip order
+   */
+  getTripOrder() {
+    return this.load(this.KEYS.TRIP_ORDER, []);
+  },
+
+  /**
+   * Set trip order
+   */
+  setTripOrder(order) {
+    return this.save(this.KEYS.TRIP_ORDER, order || []);
+  },
+
   clearTrips() {
     this.saveTrips([]);
     this.remove(this.KEYS.CURRENT_TRIP);
+    this.remove(this.KEYS.TRIP_ORDER);
   }
 };
 

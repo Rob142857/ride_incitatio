@@ -14,6 +14,7 @@ const App = {
   lastRerouteAt: 0,
   loginPromptShown: false,
   tripDetailId: null,
+  tripListCache: [],
 
   /**
    * Initialize the application
@@ -563,6 +564,34 @@ const App = {
     this.createNewTrip();
   },
 
+  applyTripOrder(trips) {
+    const order = Storage.getTripOrder() || [];
+    const byId = new Map(trips.map((t) => [t.id, t]));
+    const seen = new Set();
+    const ordered = [];
+
+    order.forEach((id) => {
+      const trip = byId.get(id);
+      if (trip) {
+        ordered.push(trip);
+        seen.add(id);
+      }
+    });
+
+    const remaining = trips
+      .filter((t) => !seen.has(t.id))
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+
+    const finalList = [...ordered, ...remaining];
+    Storage.setTripOrder(finalList.map((t) => t.id));
+    return finalList;
+  },
+
+  bumpTripToTop(tripId) {
+    const order = Storage.getTripOrder().filter((id) => id !== tripId);
+    Storage.setTripOrder([tripId, ...order]);
+  },
+
   /**
    * One-time migration: if user just logged in and cloud is empty but local has trips,
    * push local trips to the cloud account.
@@ -639,6 +668,7 @@ const App = {
         const fullTrip = await API.trips.get(trip.id);
         this.currentTrip = fullTrip;
         this.loadTripData(fullTrip);
+        this.bumpTripToTop(fullTrip.id);
         this.refreshTripsList();
         UI.showToast('New trip created', 'success');
         return;
@@ -659,6 +689,7 @@ const App = {
     Storage.setCurrentTripId(trip.id);
     
     this.loadTripData(trip);
+    this.bumpTripToTop(trip.id);
     this.refreshTripsList();
     
     UI.showToast('New trip created', 'success');
@@ -1218,7 +1249,33 @@ const App = {
     }
     
     const currentId = this.currentTrip?.id;
-    UI.renderTrips(trips, currentId);
+    if (!trips.length) {
+      Storage.setTripOrder([]);
+      this.tripListCache = [];
+      UI.renderTrips([], currentId);
+      return;
+    }
+
+    const orderedTrips = this.applyTripOrder(trips);
+    this.tripListCache = orderedTrips;
+    UI.renderTrips(orderedTrips, currentId);
+  },
+
+  reorderTrips(tripId, direction) {
+    if (!this.tripListCache || this.tripListCache.length === 0) return;
+
+    const trips = [...this.tripListCache];
+    const index = trips.findIndex((t) => t.id === tripId);
+    if (index === -1) return;
+
+    const delta = direction === 'up' ? -1 : 1;
+    const target = index + delta;
+    if (target < 0 || target >= trips.length) return;
+
+    [trips[index], trips[target]] = [trips[target], trips[index]];
+    Storage.setTripOrder(trips.map((t) => t.id));
+    this.tripListCache = trips;
+    UI.renderTrips(trips, this.currentTrip?.id);
   },
 
   /**
@@ -1234,6 +1291,8 @@ const App = {
     }
     
     Storage.deleteTrip(tripId);
+    Storage.setTripOrder(Storage.getTripOrder().filter((id) => id !== tripId));
+    this.tripListCache = (this.tripListCache || []).filter((t) => t.id !== tripId);
     
     if (this.currentTrip?.id === tripId) {
       await this.loadInitialTrip();

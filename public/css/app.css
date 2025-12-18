@@ -1360,6 +1360,25 @@ body.ride-mode {
   margin-top: 8px;
 }
 
+.trip-actions-row .trip-reorder {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.trip-actions-row .icon-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text-strong);
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.trip-actions-row .icon-btn:hover {
+  background: var(--bg-hover);
+}
+
 .link-btn {
   background: none;
   border: none;
