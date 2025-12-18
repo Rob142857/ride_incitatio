@@ -1495,6 +1495,50 @@ body.ride-mode {
   border-left: 4px solid var(--danger);
 }
 
+.journal-attachments,
+.note-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #d9deea;
+  border-radius: 999px;
+  background: #f6f8fb;
+  font-size: 12px;
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.attachment-pill a {
+  color: #0f172a;
+  text-decoration: none;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.attachment-remove:hover {
+  color: #ef4444;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;

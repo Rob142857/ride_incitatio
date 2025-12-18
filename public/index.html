@@ -263,11 +263,15 @@
           <div class="field-row">
             <label class="field-label">Attach a file</label>
             <div class="pill-actions">
-              <input type="file" id="journalAttachmentFile" class="hidden">
+              <input type="file" id="journalAttachmentFile" accept="image/*" class="hidden">
               <button type="button" class="secondary-btn" id="journalAttachmentBtn">Choose file</button>
               <span class="microcopy" id="journalAttachmentFileName"></span>
             </div>
             <p class="microcopy">Upload to the current note after saving.</p>
+          </div>
+          <div class="field-row attachments-row">
+            <label class="field-label">Attachments</label>
+            <div id="noteAttachmentList" class="note-attachments"></div>
           </div>
           <div class="modal-actions">
             <button type="button" class="cancel-btn" data-close>Cancel</button>

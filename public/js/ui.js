@@ -14,6 +14,8 @@ const UI = {
     this.bindModals();
     this.bindForms();
     this.bindFullscreen();
+    const attachmentList = document.getElementById('noteAttachmentList');
+    if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
     return this;
   },
 
@@ -183,6 +185,10 @@ const UI = {
       // Disable waypoint mode if it was the waypoint modal
       if (modalId === 'waypointModal') {
         MapManager.disableAddWaypointMode();
+      }
+      if (modalId === 'noteModal') {
+        const attachmentList = document.getElementById('noteAttachmentList');
+        if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
       }
     }
   },
@@ -431,17 +437,27 @@ const UI = {
     }
 
     container.innerHTML = entries
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
       .map(entry => `
         <div class="journal-entry ${entry.isPrivate ? 'private' : ''}" data-id="${entry.id}">
           <div class="journal-header">
             <div class="journal-title">
               ${entry.isPrivate ? '🔒 ' : ''}${this.escapeHtml(entry.title)}
             </div>
-            <div class="journal-date">${this.formatDate(entry.createdAt)}</div>
+            <div class="journal-date">${this.formatDate(entry.createdAt || entry.created_at)}</div>
           </div>
           <div class="journal-content">${this.escapeHtml(entry.content)}</div>
-          ${entry.tags.length > 0 ? `
+          ${entry.attachments?.length ? `
+            <div class="journal-attachments">
+              ${entry.attachments.map(att => `
+                <div class="attachment-pill" data-attachment-id="${att.id}">
+                  <a href="${att.url}" target="_blank" rel="noopener">${this.escapeHtml(att.original_name || att.filename || att.name || 'Attachment')}</a>
+                  <button class="attachment-remove" data-attachment-id="${att.id}" data-entry-id="${entry.id}" aria-label="Remove attachment">×</button>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+          ${entry.tags?.length > 0 ? `
             <div class="journal-tags">
               ${entry.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('')}
             </div>
@@ -462,6 +478,17 @@ const UI = {
           const id = el.dataset.id;
           if (!id) return;
           App.startEditJournalEntry(id);
+        });
+      });
+
+      container.querySelectorAll('.attachment-remove').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const attachmentId = btn.dataset.attachmentId;
+          const entryId = btn.dataset.entryId;
+          if (attachmentId && entryId) {
+            App.deleteAttachment(attachmentId, entryId);
+          }
         });
       });
   },

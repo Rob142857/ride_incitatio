@@ -209,6 +209,7 @@ const App = {
     if (privateEl) privateEl.checked = !!entry.isPrivate;
     if (tagsEl) tagsEl.value = (entry.tags || []).join(', ');
     if (idEl) idEl.value = entry.id;
+    this.renderNoteAttachments(entry);
     UI.openModal('noteModal');
   },
 
@@ -220,6 +221,38 @@ const App = {
     fileInput.value = '';
     if (fileName) fileName.textContent = '';
     fileInput.click();
+  },
+
+  renderNoteAttachments(entry) {
+    const listEl = document.getElementById('noteAttachmentList');
+    if (!listEl) return;
+    const attachments = entry?.attachments || [];
+    if (!attachments.length) {
+      listEl.innerHTML = '<div class="microcopy">No attachments yet.</div>';
+      return;
+    }
+
+    listEl.innerHTML = attachments.map((att) => {
+      const name = UI.escapeHtml(att.original_name || att.filename || att.name || 'Attachment');
+      return `
+        <div class="attachment-pill" data-attachment-id="${att.id}">
+          <a href="${att.url}" target="_blank" rel="noopener">${name}</a>
+          <button type="button" class="attachment-remove" data-attachment-id="${att.id}" data-entry-id="${entry.id}" aria-label="Remove attachment">×</button>
+        </div>
+      `;
+    }).join('');
+
+    listEl.querySelectorAll('.attachment-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const attachmentId = btn.dataset.attachmentId;
+        const entryId = btn.dataset.entryId;
+        if (attachmentId && entryId) {
+          this.deleteAttachment(attachmentId, entryId);
+        }
+      });
+    });
   },
 
   bindSessionRefresh() {
@@ -326,6 +359,7 @@ const App = {
         tags: []
       });
       if (!this.currentTrip.journal) this.currentTrip.journal = [];
+      entry.attachments = [];
       this.currentTrip.journal.push(entry);
     } catch (err) {
       console.error('Failed to create photo note', err);
@@ -335,7 +369,8 @@ const App = {
 
     try {
       UI.showToast('Uploading photo...', 'info');
-      await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entry.id });
+      const attachment = await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entry.id });
+      this.addAttachmentToEntry(entry.id, attachment, true);
       UI.showToast('Photo saved to trip', 'success');
     } catch (err) {
       console.error('Photo upload failed', err);
@@ -343,6 +378,32 @@ const App = {
     }
 
     UI.renderJournal(this.currentTrip.journal);
+    this.renderNoteAttachments(entry);
+  },
+
+  addAttachmentToEntry(entryId, attachment, prepend = false) {
+    if (!this.currentTrip) return;
+    if (!this.currentTrip.attachments) this.currentTrip.attachments = [];
+    const existingTripAttachmentIndex = this.currentTrip.attachments.findIndex((a) => a.id === attachment.id);
+    if (existingTripAttachmentIndex === -1) {
+      if (prepend) {
+        this.currentTrip.attachments.unshift(attachment);
+      } else {
+        this.currentTrip.attachments.push(attachment);
+      }
+    }
+
+    const entry = (this.currentTrip.journal || []).find((e) => e.id === entryId);
+    if (!entry) return;
+    if (!entry.attachments) entry.attachments = [];
+    const existing = entry.attachments.find((a) => a.id === attachment.id);
+    if (!existing) {
+      if (prepend) {
+        entry.attachments.unshift(attachment);
+      } else {
+        entry.attachments.push(attachment);
+      }
+    }
   },
 
   formatDistance(meters) {
@@ -850,6 +911,7 @@ const App = {
   loadTripData(trip) {
     // Normalize share settings for downstream sharing UI
     Trip.ensureShareSettings(trip);
+    this.attachJournalAttachments(trip);
     this.currentTrip = trip;
     
     // Update UI
@@ -866,6 +928,24 @@ const App = {
     if (trip.waypoints && trip.waypoints.length > 0) {
       MapManager.fitToWaypoints(trip.waypoints);
     }
+  },
+
+  attachJournalAttachments(trip) {
+    if (!trip) return;
+    const attachments = Array.isArray(trip.attachments) ? trip.attachments : [];
+    const byEntry = new Map();
+    attachments.forEach((att) => {
+      const entryId = att.journal_entry_id || att.journalEntryId;
+      if (!entryId) return;
+      if (!byEntry.has(entryId)) byEntry.set(entryId, []);
+      byEntry.get(entryId).push(att);
+    });
+
+    trip.journal = (trip.journal || []).map((entry) => ({
+      ...entry,
+      attachments: byEntry.get(entry.id) || entry.attachments || []
+    }));
+    trip.attachments = attachments;
   },
 
   /**
@@ -1096,6 +1176,7 @@ const App = {
         tags: data.tags
       });
       if (!this.currentTrip.journal) this.currentTrip.journal = [];
+      entry.attachments = [];
       this.currentTrip.journal.push(entry);
     } catch (error) {
       console.error('Failed to add journal entry:', error);
@@ -1131,7 +1212,10 @@ const App = {
     // Sync local array
     if (updated) {
       const idx = this.currentTrip.journal.findIndex((e) => e.id === entryId);
-      if (idx >= 0) this.currentTrip.journal[idx] = updated;
+      if (idx >= 0) {
+        const existing = this.currentTrip.journal[idx];
+        this.currentTrip.journal[idx] = { ...updated, attachments: existing?.attachments || [] };
+      }
     }
 
     UI.renderJournal(this.currentTrip.journal);
@@ -1171,11 +1255,59 @@ const App = {
     }
     try {
       UI.showToast('Uploading attachment...', 'info');
-      await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entryId });
+      const attachment = await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entryId });
+      this.addAttachmentToEntry(entryId, attachment, true);
       UI.showToast('Attachment uploaded', 'success');
     } catch (err) {
       console.error('Attachment upload failed', err);
       UI.showToast('Attachment upload failed', 'error');
+      return;
+    }
+
+    UI.renderJournal(this.currentTrip.journal);
+    const entry = (this.currentTrip.journal || []).find((e) => e.id === entryId);
+    if (entry) {
+      this.renderNoteAttachments(entry);
+    }
+  },
+
+  removeAttachmentFromState(attachmentId) {
+    if (!this.currentTrip) return;
+    if (Array.isArray(this.currentTrip.attachments)) {
+      this.currentTrip.attachments = this.currentTrip.attachments.filter((a) => a.id !== attachmentId);
+    }
+    if (Array.isArray(this.currentTrip.journal)) {
+      this.currentTrip.journal.forEach((entry) => {
+        if (Array.isArray(entry.attachments)) {
+          entry.attachments = entry.attachments.filter((a) => a.id !== attachmentId);
+        }
+      });
+    }
+  },
+
+  async deleteAttachment(attachmentId, entryId) {
+    if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Sign in to remove attachments', 'error');
+      return;
+    }
+
+    try {
+      await API.attachments.delete(attachmentId);
+      this.removeAttachmentFromState(attachmentId);
+      UI.showToast('Attachment removed', 'success');
+    } catch (err) {
+      console.error('Failed to delete attachment', err);
+      UI.showToast('Could not delete attachment', 'error');
+      return;
+    }
+
+    UI.renderJournal(this.currentTrip.journal || []);
+    if (entryId) {
+      const entry = (this.currentTrip.journal || []).find((e) => e.id === entryId);
+      if (entry) {
+        this.renderNoteAttachments(entry);
+      }
     }
   },
 
