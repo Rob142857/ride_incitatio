@@ -40,6 +40,8 @@ const App = {
     
     // Try to authenticate if cloud is available
     await this.checkAuth();
+    // Always clear any stale local caches once auth is known; we only trust server trips now
+    Storage.clearTrips();
     this.configureLoginLinks();
     if (!this.isSharedView) {
       this.showLoginPromptIfNeeded();
@@ -521,14 +523,6 @@ const App = {
       try {
         let trips = await API.trips.list();
 
-        // If cloud is empty but local has data, migrate once
-        if (trips.length === 0) {
-          const migrated = await this.migrateLocalTripsToCloud();
-          if (migrated > 0) {
-            trips = await API.trips.list();
-          }
-        }
-
         if (trips.length > 0) {
           const trip = await API.trips.get(trips[0].id);
           this.loadTripData(trip);
@@ -537,7 +531,12 @@ const App = {
         }
       } catch (error) {
         console.error('Failed to load cloud trips:', error);
-        this.fallbackToLocal();
+        UI.showToast('Unable to load trips from server. Please retry online.', 'error');
+        UI.renderTrips([], null);
+        UI.renderWaypoints([]);
+        UI.renderJournal([]);
+        UI.updateTripTitle('');
+        UI.updateTripStats(null);
       }
     } else {
       // When not authenticated, skip creating/loading local trips; wait for login
@@ -552,18 +551,6 @@ const App = {
   /**
    * Fallback to local storage
    */
-  fallbackToLocal() {
-    const currentTripId = Storage.getCurrentTripId();
-    if (currentTripId) {
-      const trip = Storage.getTrip(currentTripId);
-      if (trip) {
-        this.loadTripData(trip);
-        return;
-      }
-    }
-    this.createNewTrip();
-  },
-
   normalizeTrip(trip) {
     if (!trip) return trip;
     const normalized = { ...trip };
@@ -607,72 +594,6 @@ const App = {
   },
 
   /**
-   * One-time migration: if user just logged in and cloud is empty but local has trips,
-   * push local trips to the cloud account.
-   */
-  async migrateLocalTripsToCloud() {
-    const localTrips = Storage.getTrips();
-    if (!localTrips.length) return 0;
-
-    let cloudTrips = [];
-    try {
-      cloudTrips = await API.trips.list();
-    } catch (err) {
-      console.error('Cannot read cloud trips during migration', err);
-      return 0;
-    }
-
-    if (cloudTrips.length > 0) return 0; // Already has cloud data; skip to avoid duplicates
-
-    let migrated = 0;
-    for (const local of localTrips) {
-      try {
-        const cloudTrip = await API.trips.create({
-          name: local.name || 'Trip',
-          description: local.description || ''
-        });
-
-        // Waypoints
-        const waypoints = Array.isArray(local.waypoints) ? local.waypoints : [];
-        for (const wp of waypoints) {
-          await API.waypoints.add(cloudTrip.id, {
-            name: wp.name,
-            address: wp.address,
-            lat: wp.lat,
-            lng: wp.lng,
-            type: wp.type,
-            notes: wp.notes,
-            sort_order: wp.order ?? wp.sort_order ?? 0
-          });
-        }
-
-        // Journal entries
-        const journal = Array.isArray(local.journal) ? local.journal : [];
-        for (const entry of journal) {
-          await API.journal.add(cloudTrip.id, {
-            title: entry.title,
-            content: entry.content,
-            is_private: entry.isPrivate,
-            tags: entry.tags,
-            location: entry.location,
-            waypoint_id: entry.waypointId || null
-          });
-        }
-
-        migrated++;
-      } catch (err) {
-        console.error('Failed to migrate a local trip', err);
-      }
-    }
-
-    if (migrated > 0) {
-      UI.showToast(`Synced ${migrated} local trip(s) to your account`, 'success');
-    }
-
-    return migrated;
-  },
-
-  /**
    * Create a new trip
    */
   async createNewTrip(name = 'New Trip') {
@@ -689,24 +610,11 @@ const App = {
       } catch (error) {
         console.error('Failed to create cloud trip:', error);
         UI.showToast('Session expired or offline. Using offline mode.', 'info');
-        // Fall back to local mode
-        this.useCloud = false;
-        this.currentUser = null;
-        this.updateUserUI();
+        UI.showToast('Login required to create trips.', 'error');
+        return;
       }
     }
-    
-    // Local fallback
-    const trip = Trip.create(name);
-    this.currentTrip = trip;
-    Storage.saveTrip(trip);
-    Storage.setCurrentTripId(trip.id);
-    
-    this.loadTripData(trip);
-    this.bumpTripToTop(trip.id);
-    this.refreshTripsList();
-    
-    UI.showToast('New trip created', 'success');
+    UI.showToast('Login to create and save trips.', 'error');
   },
 
   /**
@@ -718,7 +626,8 @@ const App = {
       if (this.useCloud && this.currentUser) {
         trip = await API.trips.get(tripId);
       } else {
-        trip = Storage.getTrip(tripId);
+        UI.showToast('Login to view trip details.', 'error');
+        return;
       }
 
       if (!trip) {
@@ -795,18 +704,8 @@ const App = {
           updatedTrip = await API.trips.get(tripId);
         }
       } else {
-        const trip = Storage.getTrip(tripId);
-        if (!trip) {
-          UI.showToast('Trip not found', 'error');
-          return;
-        }
-        trip.name = name;
-        trip.description = description;
-        trip.is_public = isPublic;
-        trip.cover_image_url = coverImageUrl;
-        trip.updatedAt = new Date().toISOString();
-        Storage.saveTrip(trip);
-        updatedTrip = trip;
+        UI.showToast('Login to update trips.', 'error');
+        return;
       }
 
       updatedTrip = this.normalizeTrip(updatedTrip);
@@ -879,17 +778,8 @@ const App = {
         return;
       } catch (error) {
         console.error('Failed to load cloud trip:', error);
+        UI.showToast('Unable to load trip from server.', 'error');
       }
-    }
-    
-    // Local fallback
-    const trip = Storage.getTrip(tripId);
-    if (trip) {
-      Storage.setCurrentTripId(tripId);
-      this.loadTripData(trip);
-      this.refreshTripsList();
-      UI.switchView('map');
-      UI.showToast(`Loaded: ${trip.name}`, 'success');
     }
   },
 
@@ -956,8 +846,6 @@ const App = {
         console.error('Failed to save to cloud:', error);
         UI.showToast('Save failed. Not saved to cloud.', 'error');
       }
-    } else {
-      Storage.saveTrip(this.currentTrip);
     }
   },
 
@@ -966,22 +854,20 @@ const App = {
    */
   async addWaypoint(data) {
     if (!this.currentTrip) return;
-    
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return null;
+    }
+
     let waypoint;
-    
-    if (this.useCloud && this.currentUser) {
-      try {
-        waypoint = await API.waypoints.add(this.currentTrip.id, data);
-        if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
-        this.currentTrip.waypoints.push(waypoint);
-      } catch (error) {
-        console.error('Failed to add waypoint to cloud:', error);
-        UI.showToast('Could not add waypoint (not saved)', 'error');
-        return null;
-      }
-    } else {
-      waypoint = Trip.addWaypoint(this.currentTrip, data);
-      Storage.saveTrip(this.currentTrip);
+    try {
+      waypoint = await API.waypoints.add(this.currentTrip.id, data);
+      if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
+      this.currentTrip.waypoints.push(waypoint);
+    } catch (error) {
+      console.error('Failed to add waypoint to cloud:', error);
+      UI.showToast('Could not add waypoint (not saved)', 'error');
+      return null;
     }
     
     // Update UI and map
@@ -1001,15 +887,17 @@ const App = {
    */
   async updateWaypointPosition(waypointId, lat, lng) {
     if (!this.currentTrip) return;
-    
-    if (this.useCloud && this.currentUser) {
-      try {
-        await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng });
-      } catch (error) {
-        console.error('Failed to update waypoint:', error);
-        UI.showToast('Move failed. Not saved to cloud.', 'error');
-        return;
-      }
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return;
+    }
+
+    try {
+      await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng });
+    } catch (error) {
+      console.error('Failed to update waypoint:', error);
+      UI.showToast('Move failed. Not saved to cloud.', 'error');
+      return;
     }
     
     Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
@@ -1028,13 +916,15 @@ const App = {
    */
   async deleteWaypoint(waypointId) {
     if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return;
+    }
     
-    if (this.useCloud && this.currentUser) {
-      try {
-        await API.waypoints.delete(this.currentTrip.id, waypointId);
-      } catch (error) {
-        console.error('Failed to delete waypoint:', error);
-      }
+    try {
+      await API.waypoints.delete(this.currentTrip.id, waypointId);
+    } catch (error) {
+      console.error('Failed to delete waypoint:', error);
     }
     
     Trip.removeWaypoint(this.currentTrip, waypointId);
@@ -1059,18 +949,21 @@ const App = {
   async reorderWaypoints(orderIds) {
     if (!this.currentTrip) return;
 
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return;
+    }
+
     // Update local order
     Trip.reorderWaypoints(this.currentTrip, orderIds);
 
-    // Persist if online
-    if (this.useCloud && this.currentUser) {
-      try {
-        await API.waypoints.reorder(this.currentTrip.id, orderIds);
-      } catch (error) {
-        console.error('Failed to reorder waypoints in cloud:', error);
-        UI.showToast('Reorder failed. Not saved to cloud.', 'error');
-        return;
-      }
+    // Persist
+    try {
+      await API.waypoints.reorder(this.currentTrip.id, orderIds);
+    } catch (error) {
+      console.error('Failed to reorder waypoints in cloud:', error);
+      UI.showToast('Reorder failed. Not saved to cloud.', 'error');
+      return;
     }
 
     this.saveCurrentTrip();
@@ -1085,27 +978,25 @@ const App = {
    */
   async addJournalEntry(data) {
     if (!this.currentTrip) return;
-    
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return null;
+    }
+
     let entry;
-    
-    if (this.useCloud && this.currentUser) {
-      try {
-        entry = await API.journal.add(this.currentTrip.id, {
-          title: data.title,
-          content: data.content,
-          is_private: data.isPrivate,
-          tags: data.tags
-        });
-        if (!this.currentTrip.journal) this.currentTrip.journal = [];
-        this.currentTrip.journal.push(entry);
-      } catch (error) {
-        console.error('Failed to add journal entry:', error);
-        UI.showToast('Note not saved to cloud.', 'error');
-        return null;
-      }
-    } else {
-      entry = Trip.addJournalEntry(this.currentTrip, data);
-      Storage.saveTrip(this.currentTrip);
+    try {
+      entry = await API.journal.add(this.currentTrip.id, {
+        title: data.title,
+        content: data.content,
+        is_private: data.isPrivate,
+        tags: data.tags
+      });
+      if (!this.currentTrip.journal) this.currentTrip.journal = [];
+      this.currentTrip.journal.push(entry);
+    } catch (error) {
+      console.error('Failed to add journal entry:', error);
+      UI.showToast('Note not saved to cloud.', 'error');
+      return null;
     }
     
     UI.renderJournal(this.currentTrip.journal);
@@ -1115,28 +1006,22 @@ const App = {
 
   async updateJournalEntry(entryId, data) {
     if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return null;
+    }
     let updated;
-    if (this.useCloud && this.currentUser) {
-      try {
-        updated = await API.journal.update(this.currentTrip.id, entryId, {
-          title: data.title,
-          content: data.content,
-          is_private: data.isPrivate,
-          tags: data.tags
-        });
-      } catch (error) {
-        console.error('Failed to update journal entry:', error);
-        UI.showToast('Note not updated in cloud.', 'error');
-        return null;
-      }
-    } else {
-      updated = Trip.updateJournalEntry(this.currentTrip, entryId, {
+    try {
+      updated = await API.journal.update(this.currentTrip.id, entryId, {
         title: data.title,
         content: data.content,
-        isPrivate: data.isPrivate,
+        is_private: data.isPrivate,
         tags: data.tags
       });
-      Storage.saveTrip(this.currentTrip);
+    } catch (error) {
+      console.error('Failed to update journal entry:', error);
+      UI.showToast('Note not updated in cloud.', 'error');
+      return null;
     }
 
     // Sync local array
@@ -1154,15 +1039,17 @@ const App = {
    */
   async deleteJournalEntry(entryId) {
     if (!this.currentTrip) return;
-    
-    if (this.useCloud && this.currentUser) {
-      try {
-        await API.journal.delete(this.currentTrip.id, entryId);
-      } catch (error) {
-        console.error('Failed to delete journal entry:', error);
-        UI.showToast('Delete failed on cloud.', 'error');
-        return;
-      }
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return;
+    }
+
+    try {
+      await API.journal.delete(this.currentTrip.id, entryId);
+    } catch (error) {
+      console.error('Failed to delete journal entry:', error);
+      UI.showToast('Delete failed on cloud.', 'error');
+      return;
     }
     
     Trip.removeJournalEntry(this.currentTrip, entryId);
@@ -1193,6 +1080,10 @@ const App = {
    */
   saveRouteData(routeData) {
     if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to edit trips.', 'error');
+      return;
+    }
     
     this.currentTrip.route = routeData;
     this.precomputeRouteMetrics();
@@ -1236,9 +1127,8 @@ const App = {
         const fullTrip = await API.trips.get(cloudTrip.id);
         this.loadTripData(fullTrip);
       } else {
-        Storage.saveTrip(trip);
-        Storage.setCurrentTripId(trip.id);
-        this.loadTripData(trip);
+        UI.showToast('Login to import trips to your account.', 'error');
+        return;
       }
       
       this.refreshTripsList();
@@ -1260,10 +1150,11 @@ const App = {
         trips = await API.trips.list();
       } catch (error) {
         console.error('Failed to load trips list:', error);
-        trips = Storage.getTrips();
+        trips = [];
+        UI.showToast('Unable to load trips from server.', 'error');
       }
     } else {
-      trips = Storage.getTrips();
+      trips = [];
     }
     
     const currentId = this.currentTrip?.id;
@@ -1309,7 +1200,6 @@ const App = {
       }
     }
     
-    Storage.deleteTrip(tripId);
     Storage.setTripOrder(Storage.getTripOrder().filter((id) => id !== tripId));
     this.tripListCache = (this.tripListCache || []).filter((t) => t.id !== tripId);
     
