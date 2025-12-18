@@ -37,8 +37,13 @@ const Share = {
         }
       } catch (err) {
         console.error('Share link generation failed', err);
-        UI.showToast('Failed to generate share link', 'error');
-        return;
+        // If a short code already exists, fall back to it; otherwise fail loudly (no offline fallback in cloud mode)
+        if (App.currentTrip?.short_code) {
+          shareUrl = `${window.location.origin.replace(/\/$/, '')}/${App.currentTrip.short_code}`;
+        } else {
+          UI.showToast('Failed to generate share link. Check you are online and signed in.', 'error');
+          return;
+        }
       }
     }
 

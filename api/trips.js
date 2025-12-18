@@ -644,23 +644,45 @@ export const TripsHandler = {
     const ext = file.name.split('.').pop() || 'bin';
     const storageKey = `trips/${params.tripId}/${id}.${ext}`;
     
-    // Upload to R2
-    await env.ATTACHMENTS.put(storageKey, file.stream(), {
-      httpMetadata: {
-        contentType: file.type
-      },
-      customMetadata: {
-        originalName: file.name,
-        tripId: params.tripId
-      }
-    });
-    
     // Parse optional metadata
     const isPrivate = formData.get('is_private') === 'true' || formData.get('is_private') === '1';
     const isCover = formData.get('is_cover') === 'true' || formData.get('is_cover') === '1';
     const caption = formData.get('caption') || '';
     const journalEntryId = formData.get('journal_entry_id') || null;
     const waypointId = formData.get('waypoint_id') || null;
+
+    // Validate scoped relations belong to this trip and user
+    if (journalEntryId) {
+      const journal = await env.DB.prepare(
+        'SELECT je.id FROM journal_entries je JOIN trips t ON je.trip_id = t.id WHERE je.id = ? AND je.trip_id = ? AND t.user_id = ?'
+      ).bind(journalEntryId, params.tripId, user.id).first();
+      if (!journal) {
+        return errorResponse('Journal entry not found for this trip', 404);
+      }
+    }
+
+    if (waypointId) {
+      const waypoint = await env.DB.prepare(
+        'SELECT w.id FROM waypoints w JOIN trips t ON w.trip_id = t.id WHERE w.id = ? AND w.trip_id = ? AND t.user_id = ?'
+      ).bind(waypointId, params.tripId, user.id).first();
+      if (!waypoint) {
+        return errorResponse('Waypoint not found for this trip', 404);
+      }
+    }
+
+    // Upload to R2 then insert DB; cleanup R2 on DB failure
+    let objectPutSucceeded = false;
+    try {
+      await env.ATTACHMENTS.put(storageKey, file.stream(), {
+        httpMetadata: {
+          contentType: file.type
+        },
+        customMetadata: {
+          originalName: file.name,
+          tripId: params.tripId
+        }
+      });
+      objectPutSucceeded = true;
     
     // If setting as cover, unset other covers
     if (isCover) {
@@ -669,42 +691,48 @@ export const TripsHandler = {
       ).bind(params.tripId).run();
     }
     
-    // Insert attachment record
-    await env.DB.prepare(
-      `INSERT INTO attachments (id, trip_id, journal_entry_id, waypoint_id, filename, original_name, mime_type, size_bytes, storage_key, is_private, is_cover, caption)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      params.tripId,
-      journalEntryId,
-      waypointId,
-      `${id}.${ext}`,
-      file.name,
-      file.type,
-      file.size,
-      storageKey,
-      isPrivate ? 1 : 0,
-      isCover ? 1 : 0,
-      caption
-    ).run();
-    
-    // Update cover_image_url on trip if this is the cover
-    if (isCover) {
+      // Insert attachment record
       await env.DB.prepare(
-        'UPDATE trips SET cover_image_url = ? WHERE id = ?'
-      ).bind(`${BASE_URL}/api/attachments/${id}`, params.tripId).run();
-    }
+        `INSERT INTO attachments (id, trip_id, journal_entry_id, waypoint_id, filename, original_name, mime_type, size_bytes, storage_key, is_private, is_cover, caption)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        params.tripId,
+        journalEntryId,
+        waypointId,
+        `${id}.${ext}`,
+        file.name,
+        file.type,
+        file.size,
+        storageKey,
+        isPrivate ? 1 : 0,
+        isCover ? 1 : 0,
+        caption
+      ).run();
     
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
-    
-    const attachment = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(id).first();
-    
-    return jsonResponse({
-      attachment: {
-        ...attachment,
-        url: `${BASE_URL}/api/attachments/${id}`
+      // Update cover_image_url on trip if this is the cover
+      if (isCover) {
+        await env.DB.prepare(
+          'UPDATE trips SET cover_image_url = ? WHERE id = ?'
+        ).bind(`${BASE_URL}/api/attachments/${id}`, params.tripId).run();
       }
-    }, 201);
+    
+      await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+
+      const attachment = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(id).first();
+
+      return jsonResponse({
+        attachment: {
+          ...attachment,
+          url: `${BASE_URL}/api/attachments/${id}`
+        }
+      }, 201);
+    } catch (err) {
+      if (objectPutSucceeded) {
+        try { await env.ATTACHMENTS.delete(storageKey); } catch (_) {}
+      }
+      throw err;
+    }
   },
 
   /**
@@ -786,6 +814,17 @@ export const TripsHandler = {
       }
       updates.push('is_cover = ?');
       values.push(body.is_cover ? 1 : 0);
+      if (!body.is_cover) {
+        // If unsetting cover, clear or recompute cover_image_url
+        const fallback = await env.DB.prepare(
+          'SELECT id FROM attachments WHERE trip_id = ? AND is_cover = 1 AND id != ? ORDER BY created_at DESC'
+        ).bind(attachment.trip_id, params.id).first();
+        if (fallback) {
+          await env.DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
+        } else {
+          await env.DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
+        }
+      }
     }
     
     if (updates.length > 0) {
@@ -823,6 +862,18 @@ export const TripsHandler = {
     
     // Delete from DB
     await env.DB.prepare('DELETE FROM attachments WHERE id = ?').bind(params.id).run();
+
+    // If the deleted attachment was the cover, recompute cover_image_url
+    if (attachment.is_cover) {
+      const fallback = await env.DB.prepare(
+        'SELECT id FROM attachments WHERE trip_id = ? AND is_cover = 1 ORDER BY created_at DESC'
+      ).bind(attachment.trip_id).first();
+      if (fallback) {
+        await env.DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
+      } else {
+        await env.DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
+      }
+    }
     
     return jsonResponse({ success: true });
   }

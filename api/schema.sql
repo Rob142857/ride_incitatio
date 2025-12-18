@@ -90,6 +90,43 @@ CREATE TABLE IF NOT EXISTS attachments (
   FOREIGN KEY (waypoint_id) REFERENCES waypoints(id) ON DELETE SET NULL
 );
 
+-- Enforce attachments stay within the same trip for journal entries and waypoints
+CREATE TRIGGER IF NOT EXISTS trg_attachments_journal_trip_insert
+BEFORE INSERT ON attachments
+WHEN NEW.journal_entry_id IS NOT NULL AND (
+  SELECT trip_id FROM journal_entries WHERE id = NEW.journal_entry_id
+) IS NOT NEW.trip_id
+BEGIN
+  SELECT RAISE(ABORT, 'journal_entry_id does not belong to trip');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_attachments_journal_trip_update
+BEFORE UPDATE ON attachments
+WHEN NEW.journal_entry_id IS NOT NULL AND (
+  SELECT trip_id FROM journal_entries WHERE id = NEW.journal_entry_id
+) IS NOT NEW.trip_id
+BEGIN
+  SELECT RAISE(ABORT, 'journal_entry_id does not belong to trip');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_attachments_waypoint_trip_insert
+BEFORE INSERT ON attachments
+WHEN NEW.waypoint_id IS NOT NULL AND (
+  SELECT trip_id FROM waypoints WHERE id = NEW.waypoint_id
+) IS NOT NEW.trip_id
+BEGIN
+  SELECT RAISE(ABORT, 'waypoint_id does not belong to trip');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_attachments_waypoint_trip_update
+BEFORE UPDATE ON attachments
+WHEN NEW.waypoint_id IS NOT NULL AND (
+  SELECT trip_id FROM waypoints WHERE id = NEW.waypoint_id
+) IS NOT NEW.trip_id
+BEGIN
+  SELECT RAISE(ABORT, 'waypoint_id does not belong to trip');
+END;
+
 -- Route data table (for custom route points)
 CREATE TABLE IF NOT EXISTS route_data (
   id TEXT PRIMARY KEY,
