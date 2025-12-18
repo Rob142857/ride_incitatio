@@ -8,6 +8,7 @@ const App = {
   useCloud: false, // Will be true when deployed to Cloudflare
   isSharedView: false,
   isRiding: false,
+  isRefreshing: false,
   rideVisitedWaypoints: null,
   rideRerouting: false,
   offRouteCounter: 0,
@@ -1405,6 +1406,48 @@ const App = {
     const orderedTrips = this.applyTripOrder(normalized);
     this.tripListCache = orderedTrips;
     UI.renderTrips(orderedTrips, currentId);
+  },
+
+  /**
+   * Refresh current trip data and list from the server (for trips, journal, waypoints views)
+   */
+  async refreshData(source = 'manual') {
+    if (this.isRefreshing) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to refresh from cloud.', 'error');
+      return;
+    }
+
+    this.isRefreshing = true;
+    try {
+      const trips = await API.trips.list();
+      const normalized = trips.map((t) => this.normalizeTrip(t));
+      const orderedTrips = this.applyTripOrder(normalized);
+      this.tripListCache = orderedTrips;
+
+      const currentId = this.currentTrip?.id || null;
+      UI.renderTrips(orderedTrips, currentId);
+
+      const targetTripId = currentId || (orderedTrips[0]?.id ?? null);
+      if (!targetTripId) {
+        MapManager.clear();
+        UI.renderWaypoints([]);
+        UI.renderJournal([]);
+        UI.updateTripTitle('');
+        UI.updateTripStats(null);
+        UI.showToast('No trips available to refresh.', 'info');
+        return;
+      }
+
+      const freshTrip = this.normalizeTrip(await API.trips.get(targetTripId));
+      this.loadTripData(freshTrip);
+      UI.showToast('Latest data loaded', 'success');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      UI.showToast('Refresh failed. Please try again.', 'error');
+    } finally {
+      this.isRefreshing = false;
+    }
   },
 
   reorderTrips(tripId, direction) {

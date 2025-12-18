@@ -10,6 +10,7 @@ const UI = {
    */
   init() {
     this.bindNavigation();
+    this.bindRefreshButtons();
     this.bindMenu();
     this.bindModals();
     this.bindForms();
@@ -17,6 +18,25 @@ const UI = {
     const attachmentList = document.getElementById('noteAttachmentList');
     if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
     return this;
+  },
+
+  bindRefreshButtons() {
+    const attach = (id, view) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await App.refreshData(view);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    };
+
+    attach('refreshWaypointsBtn', 'waypoints');
+    attach('refreshJournalBtn', 'journal');
+    attach('refreshTripsBtn', 'trips');
   },
 
   /**

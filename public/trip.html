@@ -783,6 +783,7 @@
           <div class="action-group">
             <button class="map-btn" id="downloadJsonBtn">Download JSON</button>
             <button class="map-btn" id="downloadGpxBtn">Download GPX</button>
+              <button class="map-btn use-trip-btn" id="useTripBtn">Use this trip</button>
           </div>
           <div class="action-group">
             <button class="map-btn" id="mapExpandBtn">Expand map</button>
@@ -798,6 +799,7 @@
       <div class="download-actions">
         <button class="map-btn" id="downloadJsonBtnAlt">Download JSON</button>
         <button class="map-btn" id="downloadGpxBtnAlt">Download GPX</button>
+        <button class="map-btn use-trip-btn" id="useTripBtnAlt">Use this trip</button>
       </div>
     </section>
     
@@ -877,6 +879,27 @@
     let map = null;
     let mapBounds = null;
     let isMapFullscreen = false;
+    const pendingImportKey = 'ride:pendingImportShortCode';
+    const useTripButtons = () => Array.from(document.querySelectorAll('.use-trip-btn'));
+
+    function setUseTripState(state, label) {
+      useTripButtons().forEach(btn => {
+        if (!btn) return;
+        if (state === 'loading') {
+          btn.disabled = true;
+          btn.textContent = label || 'Importing...';
+        } else if (state === 'success') {
+          btn.disabled = true;
+          btn.textContent = label || 'Added';
+        } else if (state === 'error') {
+          btn.disabled = false;
+          btn.textContent = label || 'Try again';
+        } else {
+          btn.disabled = false;
+          btn.textContent = label || 'Use this trip';
+        }
+      });
+    }
     
     function showError() {
       document.getElementById('loading').style.display = 'none';
@@ -1252,6 +1275,13 @@
     document.getElementById('downloadGpxBtnAlt')?.addEventListener('click', () => {
       if (window.trip) downloadGpx(window.trip);
     });
+    useTripButtons().forEach((btn) => {
+      btn.addEventListener('click', () => {
+        setUseTripState('loading', 'Preparing...');
+        importTripToAccount();
+      });
+    });
+    setUseTripState('default');
 
     function showError(title = 'Trip Not Found', message = 'This trip may have been removed or the link is incorrect.') {
       document.getElementById('loading').style.display = 'none';
@@ -1263,6 +1293,106 @@
 
     function showPrivate() {
       showError('Trip Is Private', 'The creator has not shared this trip publicly yet.');
+    }
+
+    function normalizeWaypointInput(wp) {
+      if (!wp) return null;
+      const lat = parseFloat(wp.lat ?? wp.latitude);
+      const lng = parseFloat(wp.lng ?? wp.lon ?? wp.longitude);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+      return {
+        name: wp.name || 'Waypoint',
+        address: wp.address || '',
+        lat,
+        lng,
+        type: wp.type || 'stop',
+        notes: wp.notes || ''
+      };
+    }
+
+    function normalizeJournalEntry(entry) {
+      if (!entry) return null;
+      return {
+        title: entry.title || 'Note',
+        content: entry.content || '',
+        is_private: entry.is_private ?? entry.isPrivate ?? false,
+        tags: Array.isArray(entry.tags) ? entry.tags : []
+      };
+    }
+
+    async function ensureUserOrPrompt() {
+      try {
+        const user = await API.auth.getUser();
+        if (user) return user;
+      } catch (err) {
+        console.error('Auth check failed:', err);
+      }
+
+      const confirmLogin = window.confirm('Sign in to save this trip to your account?');
+      if (!confirmLogin) return null;
+
+      if (shortCode) {
+        localStorage.setItem(pendingImportKey, shortCode);
+      }
+
+      const returnTo = window.location.href;
+      window.location.href = API.auth.loginUrl('google', returnTo);
+      return null;
+    }
+
+    async function importTripToAccount(autoResume = false) {
+      if (!window.trip) return;
+
+      const user = await ensureUserOrPrompt();
+      if (!user) {
+        if (!autoResume) setUseTripState('default');
+        return;
+      }
+
+      setUseTripState('loading', 'Importing...');
+
+      try {
+        const baseTrip = await API.trips.create({
+          name: window.trip.title || window.trip.name || 'Imported Trip',
+          description: window.trip.description || ''
+        });
+
+        if (Array.isArray(window.trip.waypoints) && window.trip.waypoints.length) {
+          for (const wp of window.trip.waypoints) {
+            const normalized = normalizeWaypointInput(wp);
+            if (!normalized) continue;
+            await API.waypoints.add(baseTrip.id, normalized);
+          }
+        }
+
+        if (Array.isArray(window.trip.journal) && window.trip.journal.length) {
+          for (const entry of window.trip.journal) {
+            const normalized = normalizeJournalEntry(entry);
+            if (!normalized) continue;
+            await API.journal.add(baseTrip.id, normalized);
+          }
+        }
+
+        if (window.trip.route) {
+          await API.trips.update(baseTrip.id, { route: window.trip.route });
+        }
+
+        localStorage.removeItem(pendingImportKey);
+        setUseTripState('success', 'Added to your trips');
+
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 800);
+      } catch (err) {
+        console.error('Failed to import trip:', err);
+        setUseTripState('error', 'Import failed. Try again');
+      }
+    }
+
+    async function maybeResumeImport() {
+      const pending = localStorage.getItem(pendingImportKey);
+      if (!pending || pending !== shortCode) return;
+      await importTripToAccount(true);
     }
 
     async function loadPublicTrip(code) {
@@ -1283,6 +1413,7 @@
         }
         window.trip = data.trip;
         renderTrip(data.trip);
+        await maybeResumeImport();
       } catch (err) {
         console.error('Failed to load trip:', err);
         showError();

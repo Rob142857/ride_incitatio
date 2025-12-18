@@ -171,7 +171,10 @@
     <section id="waypointsPanel" class="panel hidden">
       <div class="panel-header">
         <h2>Waypoints</h2>
-        <button id="addWaypointBtn" class="primary-btn">+ Add</button>
+        <div class="panel-actions">
+          <button id="refreshWaypointsBtn" class="icon-btn" aria-label="Refresh waypoints">↻</button>
+          <button id="addWaypointBtn" class="primary-btn">+ Add</button>
+        </div>
       </div>
       <div id="waypointsList" class="panel-content"></div>
     </section>
@@ -179,7 +182,10 @@
     <section id="journalPanel" class="panel hidden">
       <div class="panel-header">
         <h2>Trip Journal</h2>
-        <button id="addNoteBtn" class="primary-btn">+ Note</button>
+        <div class="panel-actions">
+          <button id="refreshJournalBtn" class="icon-btn" aria-label="Refresh journal">↻</button>
+          <button id="addNoteBtn" class="primary-btn">+ Note</button>
+        </div>
       </div>
       <div id="journalList" class="panel-content"></div>
     </section>
@@ -187,6 +193,9 @@
     <section id="tripsPanel" class="panel hidden">
       <div class="panel-header">
         <h2>My Trips</h2>
+        <div class="panel-actions">
+          <button id="refreshTripsBtn" class="icon-btn" aria-label="Refresh trips">↻</button>
+        </div>
       </div>
       <div id="tripsList" class="panel-content"></div>
           <template id="tripItemTemplate">
