@@ -16,7 +16,8 @@ const API = {
         'Content-Type': 'application/json',
         ...options.headers
       },
-      credentials: 'include' // Include cookies for session
+      credentials: 'include', // Include cookies for session
+      cache: 'no-store'
     };
     
     if (options.body && typeof options.body === 'object') {
