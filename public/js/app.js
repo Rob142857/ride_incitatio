@@ -132,11 +132,21 @@ const App = {
   bindTripDetails() {
     const form = document.getElementById('tripDetailsForm');
     const copyBtn = document.getElementById('tripDetailCopy');
+    const coverFileInput = document.getElementById('tripDetailCoverFile');
+    const coverFileBtn = document.getElementById('tripDetailCoverFileBtn');
+    const coverFileName = document.getElementById('tripDetailCoverFileName');
 
     if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         this.saveTripDetails();
+      });
+    }
+
+    if (coverFileBtn && coverFileInput) {
+      coverFileBtn.addEventListener('click', () => coverFileInput.click());
+      coverFileInput.addEventListener('change', () => {
+        coverFileName.textContent = coverFileInput.files?.[0]?.name || '';
       });
     }
 
@@ -618,6 +628,8 @@ const App = {
     document.getElementById('tripDetailDescription').value = trip.description || '';
     const coverInput = document.getElementById('tripDetailCover');
     if (coverInput) coverInput.value = trip.cover_image_url || '';
+    const coverFileName = document.getElementById('tripDetailCoverFileName');
+    if (coverFileName) coverFileName.textContent = '';
     document.getElementById('tripDetailPublic').checked = !!trip.is_public;
     const linkInput = document.getElementById('tripDetailLink');
     const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
@@ -628,7 +640,10 @@ const App = {
   async saveTripDetails() {
     const name = document.getElementById('tripDetailName').value.trim();
     const description = document.getElementById('tripDetailDescription').value.trim();
-    const coverImageUrl = document.getElementById('tripDetailCover').value.trim();
+    const coverInput = document.getElementById('tripDetailCover');
+    const coverFileInput = document.getElementById('tripDetailCoverFile');
+    const coverFile = coverFileInput?.files?.[0];
+    let coverImageUrl = coverInput?.value?.trim() || '';
     const isPublic = document.getElementById('tripDetailPublic').checked;
     const tripId = this.tripDetailId;
 
@@ -644,6 +659,17 @@ const App = {
 
     try {
       let updatedTrip;
+      if (coverFile && (!this.useCloud || !this.currentUser)) {
+        UI.showToast('Sign in to upload a cover image', 'error');
+        return;
+      }
+
+      if (coverFile) {
+        UI.showToast('Uploading cover image...', 'info');
+        const attachment = await API.attachments.upload(tripId, coverFile, { is_cover: true });
+        coverImageUrl = attachment.url;
+        if (coverInput) coverInput.value = coverImageUrl;
+      }
       if (this.useCloud && this.currentUser) {
         await API.trips.update(tripId, { name, description, is_public: isPublic, cover_image_url: coverImageUrl || null });
 
@@ -673,6 +699,11 @@ const App = {
       this.loadTripDataIfCurrent(updatedTrip);
       this.refreshTripsList();
       this.fillTripDetailsForm(updatedTrip);
+      if (coverFileInput) {
+        coverFileInput.value = '';
+        const coverFileName = document.getElementById('tripDetailCoverFileName');
+        if (coverFileName) coverFileName.textContent = '';
+      }
       UI.showToast('Trip updated', 'success');
       UI.closeModal('tripDetailsModal');
     } catch (err) {

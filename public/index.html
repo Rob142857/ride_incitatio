@@ -347,6 +347,18 @@
 
           <div class="field-row">
             <div>
+              <label class="field-label">Upload cover image</label>
+              <div class="pill-actions">
+                <input type="file" id="tripDetailCoverFile" accept="image/*" class="hidden">
+                <button type="button" class="secondary-btn" id="tripDetailCoverFileBtn">Choose file</button>
+                <span class="microcopy" id="tripDetailCoverFileName"></span>
+              </div>
+              <p class="microcopy">Pick an image to upload as the trip cover.</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div>
               <label class="field-label">Sharing</label>
               <label class="public-toggle-label">
                 <input type="checkbox" id="tripDetailPublic"> Publicly shared
