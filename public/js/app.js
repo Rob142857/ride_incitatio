@@ -1038,7 +1038,13 @@ const App = {
         });
       } catch (error) {
         console.error('Failed to save to cloud:', error);
-        UI.showToast('Save failed. Not saved to cloud.', 'error');
+        if (error.status === 404) {
+          // Trip missing on server; recover by reloading or creating a fresh trip
+          UI.showToast('Trip missing on server. Reloading your trips…', 'error');
+          await this.loadInitialTrip();
+        } else {
+          UI.showToast('Save failed. Not saved to cloud.', 'error');
+        }
       }
     }
   },
