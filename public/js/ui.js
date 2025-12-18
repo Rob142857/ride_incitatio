@@ -107,7 +107,7 @@ const UI = {
 
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closeMenuFn();
-      this.showToast('Ride Trip Planner v1.0 • Made in Australia 🇦🇺', 'info');
+      this.openModal('aboutModal');
     });
   },
 

@@ -6,6 +6,7 @@ const App = {
   currentUser: null,
   isOnline: true,
   useCloud: false, // Will be true when deployed to Cloudflare
+  isSharedView: false,
   loginPromptShown: false,
 
   /**
@@ -23,19 +24,22 @@ const App = {
     UI.init();
     MapManager.init();
     
-    // Try to authenticate if cloud is available
-    await this.checkAuth();
-    this.configureLoginLinks();
-    this.showLoginPromptIfNeeded();
-    
-    // Bind user button
-    this.bindUserButton();
-    
     // Check for shared trip in URL
     const urlParams = new URLSearchParams(window.location.search);
     const sharedTripId = urlParams.get('trip');
     const isEmbed = urlParams.get('embed') === 'true';
     const authError = urlParams.get('error');
+    this.isSharedView = !!sharedTripId;
+    
+    // Try to authenticate if cloud is available
+    await this.checkAuth();
+    this.configureLoginLinks();
+    if (!this.isSharedView) {
+      this.showLoginPromptIfNeeded();
+    }
+    
+    // Bind user button
+    this.bindUserButton();
     
     if (authError) {
       UI.showToast('Login failed. Please try again.', 'error');
@@ -75,9 +79,6 @@ const App = {
     }
   },
 
-  /**
-   * Wire login buttons with return URL
-   */
   configureLoginLinks() {
     const returnTo = window.location.href;
     document.querySelectorAll('[data-login-provider]').forEach((el) => {
