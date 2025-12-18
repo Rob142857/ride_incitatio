@@ -420,6 +420,7 @@ const App = {
     
     // Update UI
     UI.updateTripTitle(trip.name);
+    UI.updateTripStats(trip);
     UI.renderWaypoints(trip.waypoints || []);
     UI.renderJournal(trip.journal || []);
     
@@ -617,6 +618,31 @@ const App = {
   },
 
   /**
+   * Reorder waypoints
+   */
+  async reorderWaypoints(orderIds) {
+    if (!this.currentTrip) return;
+
+    // Update local order
+    Trip.reorderWaypoints(this.currentTrip, orderIds);
+
+    // Persist if online
+    if (this.useCloud && this.currentUser) {
+      try {
+        await API.waypoints.reorder(this.currentTrip.id, orderIds);
+      } catch (error) {
+        console.error('Failed to reorder waypoints in cloud:', error);
+      }
+    }
+
+    this.saveCurrentTrip();
+
+    // Refresh UI and map
+    UI.renderWaypoints(this.currentTrip.waypoints);
+    MapManager.updateWaypoints(this.currentTrip.waypoints);
+  },
+
+  /**
    * Add journal entry
    */
   async addJournalEntry(data) {
@@ -686,6 +712,7 @@ const App = {
       }));
     }
     
+    UI.updateTripStats(this.currentTrip);
     this.saveCurrentTrip();
   },
 

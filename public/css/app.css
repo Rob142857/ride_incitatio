@@ -137,6 +137,32 @@ body {
   pointer-events: auto;
 }
 
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 65%;
+}
+
+.topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.topbar-logo img {
+  height: 24px;
+  width: auto;
+  display: block;
+}
+
 #tripTitle {
   font-size: 1.1rem;
   font-weight: 600;
@@ -144,7 +170,23 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60%;
+}
+
+.trip-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.trip-stat-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 
 /* Icon Button */
@@ -600,6 +642,16 @@ body {
   padding: 16px;
 }
 
+#waypointModal {
+  background: rgba(0, 0, 0, 0.35);
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+#waypointModal .modal-content {
+  margin: 0 12px 12px 12px;
+}
+
 .modal:not(.hidden) {
   opacity: 1;
   pointer-events: auto;
@@ -946,6 +998,26 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  cursor: grab;
+}
+
+.waypoint-item.dragging {
+  opacity: 0.7;
+}
+
+.waypoint-item.drag-over {
+  outline: 1px dashed var(--accent);
+}
+
+.waypoint-handle {
+  width: 20px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: grab;
+  flex-shrink: 0;
 }
 
 .waypoint-icon {
@@ -1075,6 +1147,33 @@ body {
 
 .trip-item.active {
   border: 2px solid var(--accent);
+}
+
+.trip-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+
+.trip-status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.trip-status-pill.public {
+  background: rgba(59, 130, 246, 0.15);
+  color: #8ab4ff;
+}
+
+.trip-status-pill.private {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f871a0;
 }
 
 .trip-name {

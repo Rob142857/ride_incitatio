@@ -1,10 +1,6 @@
 /**
  * Utility functions for the API
  */
-
-/**
- * CORS headers
- */
 export function cors(response = new Response(null, { status: 204 })) {
   const headers = new Headers(response.headers);
   headers.set('Access-Control-Allow-Origin', '*');
@@ -44,16 +40,42 @@ export function generateId() {
 }
 
 /**
- * Generate short URL code (6 characters, base62)
- * Uses characters: 0-9, a-z, A-Z for 62^6 = 56+ billion combinations
+ * Generate deterministic short code from a stable ID (base62, default length 6).
+ * Uses a 64-bit rolling hash to keep the same code for the same ID and keep
+ * regeneration consistent across environments. Collisions are extremely rare
+ * but still handled by callers.
  */
-export function generateShortCode() {
-  const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const BASE62_CHARS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+export function generateShortCodeForId(id, length = 6) {
+  if (!id) return generateShortCode(length);
+  const prime = 1099511628211n; // FNV-like prime
+  const modMask = (1n << 64n) - 1n; // Keep hash bounded
+  let hash = 14695981039346656037n; // FNV offset basis
+
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash ^ BigInt(id.charCodeAt(i))) * prime & modMask;
+  }
+
+  const base = BigInt(BASE62_CHARS.length);
   let code = '';
-  const array = new Uint8Array(6);
+  let value = hash;
+  for (let i = 0; i < length; i++) {
+    code += BASE62_CHARS[Number(value % base)];
+    value = value / base;
+  }
+  return code;
+}
+
+/**
+ * Generate short URL code (base62). Uses characters: 0-9, a-z, A-Z.
+ */
+export function generateShortCode(length = 6) {
+  let code = '';
+  const array = new Uint8Array(length);
   crypto.getRandomValues(array);
-  for (let i = 0; i < 6; i++) {
-    code += chars[array[i] % 62];
+  for (let i = 0; i < length; i++) {
+    code += BASE62_CHARS[array[i] % 62];
   }
   return code;
 }

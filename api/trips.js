@@ -3,7 +3,7 @@
  * CRUD operations for trips, waypoints, journal entries, and attachments
  */
 
-import { jsonResponse, errorResponse, generateId, generateShortCode, parseBody, BASE_URL } from './utils.js';
+import { jsonResponse, errorResponse, generateId, generateShortCode, generateShortCodeForId, parseBody, BASE_URL } from './utils.js';
 
 export const TripsHandler = {
   /**
@@ -44,13 +44,12 @@ export const TripsHandler = {
     const id = generateId();
     const settings = JSON.stringify(body.settings || {});
     
-    // Generate short code with collision retry (max 3 attempts)
-    let shortCode;
+    // Generate deterministic short code from trip ID, with rare collision retries
+    let shortCode = generateShortCodeForId(id);
     let attempts = 0;
     const maxAttempts = 3;
     
     while (attempts < maxAttempts) {
-      shortCode = generateShortCode();
       try {
         await env.DB.prepare(
           `INSERT INTO trips (id, user_id, name, description, settings, short_code) 
@@ -60,7 +59,8 @@ export const TripsHandler = {
       } catch (error) {
         if (error.message?.includes('UNIQUE constraint') && attempts < maxAttempts - 1) {
           attempts++;
-          continue; // Retry with new code
+          shortCode = generateShortCodeForId(`${id}:${attempts}`);
+          continue; // Retry with deterministic variant
         }
         throw error; // Re-throw if not a collision or max attempts reached
       }
@@ -502,12 +502,11 @@ export const TripsHandler = {
       return errorResponse('Trip not found', 404);
     }
     
-    // Generate short code if not exists (with collision retry)
-    let shortCode = trip.short_code;
-    if (!shortCode) {
+    // Generate deterministic short code if missing (with collision retry)
+    let shortCode = trip.short_code || generateShortCodeForId(trip.id);
+    if (!trip.short_code) {
       let attempts = 0;
       while (attempts < 3) {
-        shortCode = generateShortCode();
         try {
           await env.DB.prepare(
             'UPDATE trips SET short_code = ?, is_public = 1 WHERE id = ?'
@@ -516,6 +515,7 @@ export const TripsHandler = {
         } catch (error) {
           if (error.message?.includes('UNIQUE constraint') && attempts < 2) {
             attempts++;
+            shortCode = generateShortCodeForId(`${trip.id}:${attempts}`);
             continue;
           }
           throw error;

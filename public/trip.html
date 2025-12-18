@@ -13,7 +13,7 @@
   <meta property="og:site_name" content="Ride">
   <meta property="og:title" content="Trip | Ride">
   <meta property="og:description" content="Explore this trip on Ride">
-  <meta property="og:image" content="https://ride.incitat.io/icons/og-default.png">
+  <meta property="og:image" content="https://ride.incitat.io/icons/og-ride.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" content="">
@@ -23,10 +23,11 @@
   <meta name="twitter:site" content="@incitatio">
   <meta name="twitter:title" content="Trip | Ride">
   <meta name="twitter:description" content="Explore this trip on Ride">
-  <meta name="twitter:image" content="https://ride.incitat.io/icons/og-default.png">
+  <meta name="twitter:image" content="https://ride.incitat.io/icons/og-ride.png">
   
   <!-- Favicons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/ride-logo-32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/ride-logo-48.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -199,6 +200,7 @@
       overflow: hidden;
       box-shadow: var(--shadow-lg);
       border: 1px solid var(--border);
+      position: relative;
     }
     
     .map-container {
@@ -209,6 +211,42 @@
     #trip-map {
       height: 100%;
       width: 100%;
+    }
+
+    .map-expand-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 20;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.6);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.2px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      backdrop-filter: blur(6px);
+    }
+
+    .map-card.fullscreen {
+      position: fixed;
+      inset: 16px;
+      width: auto;
+      height: calc(100vh - 32px);
+      margin: 0;
+      max-width: none;
+      z-index: 1200;
+    }
+
+    .map-card.fullscreen .map-container {
+      height: 100%;
+    }
+
+    body.no-scroll {
+      overflow: hidden;
     }
     
     .map-stats {
@@ -462,9 +500,21 @@
       margin-bottom: 16px;
     }
     
-    .footer-brand svg {
+    .footer-brand picture {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+
+    .footer-brand img {
       width: 24px;
       height: 24px;
+      display: block;
     }
     
     .footer-brand-text {
@@ -696,6 +746,7 @@
     <!-- Map Section -->
     <section class="map-section container">
       <div class="map-card">
+        <button class="map-expand-btn" id="mapExpandBtn">Expand map</button>
         <div class="map-container">
           <div id="trip-map"></div>
         </div>
@@ -745,9 +796,10 @@
     <!-- Footer -->
     <footer class="page-footer">
       <div class="footer-brand">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-        </svg>
+        <picture>
+          <source srcset="/icons/ride-logo.webp" type="image/webp">
+          <img src="/icons/ride-logo.png" alt="Ride logo">
+        </picture>
         <span class="footer-brand-text">Ride</span>
       </div>
       <p class="footer-tagline">Trip planning made beautiful</p>
@@ -778,6 +830,8 @@
   
   <script>
     let map = null;
+    let mapBounds = null;
+    let isMapFullscreen = false;
     
     function showError() {
       document.getElementById('loading').style.display = 'none';
@@ -983,11 +1037,31 @@
       
       // Fit bounds
       if (bounds.length) {
-        map.fitBounds(bounds, { padding: [30, 30] });
+        mapBounds = L.latLngBounds(bounds);
+        map.fitBounds(mapBounds, { padding: [30, 30] });
       } else {
         // Default to Australia
         map.setView([-25.2744, 133.7751], 4);
+        mapBounds = null;
       }
+    }
+
+    function toggleMapFullscreen() {
+      const card = document.querySelector('.map-card');
+      const btn = document.getElementById('mapExpandBtn');
+      if (!card || !btn || !map) return;
+
+      isMapFullscreen = !isMapFullscreen;
+      card.classList.toggle('fullscreen', isMapFullscreen);
+      document.body.classList.toggle('no-scroll', isMapFullscreen);
+      btn.textContent = isMapFullscreen ? 'Close map' : 'Expand map';
+
+      setTimeout(() => {
+        map.invalidateSize();
+        if (mapBounds) {
+          map.fitBounds(mapBounds, { padding: [30, 30] });
+        }
+      }, 100);
     }
     
     function updateMeta(property, content) {
@@ -1102,6 +1176,9 @@
     } else {
       showError();
     }
+
+    // Expand map handler
+    document.getElementById('mapExpandBtn').addEventListener('click', toggleMapFullscreen);
   </script>
   
 </body>

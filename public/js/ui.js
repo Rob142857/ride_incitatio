@@ -281,6 +281,36 @@ const UI = {
     document.getElementById('tripTitle').textContent = name;
   },
 
+  updateTripStats(trip) {
+    const el = document.getElementById('tripStats');
+    if (!el) return;
+
+    const distance = trip?.route?.distance;
+    const time = trip?.route?.time;
+
+    const parts = [];
+    if (typeof distance === 'number') parts.push(this.formatDistance(distance));
+    if (typeof time === 'number') parts.push(this.formatDuration(time));
+
+    el.innerHTML = parts.length
+      ? parts.map((p) => `<span class="trip-stat-pill">${p}</span>`).join('')
+      : '';
+  },
+
+  formatDistance(meters) {
+    if (meters === undefined || meters === null) return '';
+    if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+    return `${Math.round(meters)} m`;
+  },
+
+  formatDuration(seconds) {
+    if (seconds === undefined || seconds === null) return '';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  },
+
   /**
    * Render waypoints list
    */
@@ -301,7 +331,10 @@ const UI = {
     container.innerHTML = waypoints
       .sort((a, b) => a.order - b.order)
       .map((wp, index) => `
-        <div class="waypoint-item" data-id="${wp.id}">
+        <div class="waypoint-item" data-id="${wp.id}" draggable="true">
+          <div class="waypoint-handle" title="Drag to reorder">
+            <svg viewBox="0 0 24 24"><path d="M10 4h2v2h-2V4zm0 4h2v2h-2V8zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm4-12h2v2h-2V4zm0 4h2v2h-2V8zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>
+          </div>
           <div class="waypoint-icon">
             <span style="font-size: 20px;">${MapManager.waypointIcons[wp.type]?.icon || '📍'}</span>
           </div>
@@ -320,6 +353,52 @@ const UI = {
           </div>
         </div>
       `).join('');
+
+    // Drag and drop reordering
+    const items = Array.from(container.querySelectorAll('.waypoint-item'));
+    let draggingId = null;
+
+    items.forEach((item) => {
+      item.addEventListener('dragstart', () => {
+        draggingId = item.dataset.id;
+        item.classList.add('dragging');
+      });
+
+      item.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        item.classList.add('drag-over');
+      });
+
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('drag-over');
+      });
+
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        item.classList.remove('drag-over');
+        if (!draggingId) return;
+        const targetId = item.dataset.id;
+        if (draggingId === targetId) return;
+
+        const orderIds = items.map(el => el.dataset.id);
+        const fromIndex = orderIds.indexOf(draggingId);
+        const toIndex = orderIds.indexOf(targetId);
+        if (fromIndex === -1 || toIndex === -1) return;
+        const [moved] = orderIds.splice(fromIndex, 1);
+        orderIds.splice(toIndex, 0, moved);
+
+        App.reorderWaypoints(orderIds);
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        draggingId = null;
+      });
+    });
   },
 
   /**
@@ -395,17 +474,54 @@ const UI = {
       const item = node.querySelector('.trip-item');
       item.dataset.id = trip.id;
       if (trip.id === currentTripId) item.classList.add('active');
+      item.tabIndex = 0;
       node.querySelector('.trip-name').textContent = this.escapeHtml(trip.name);
       node.querySelector('.trip-meta').innerHTML = `<span>📍 ${stats.waypointCount} waypoints</span> <span>📝 ${stats.journalCount} notes</span>`;
-      const toggle = node.querySelector('.public-toggle-checkbox');
-      toggle.checked = !!trip.is_public;
-      toggle.onchange = (e) => {
-        App.setTripPublic(trip.id, e.target.checked);
-      };
+      const statusPill = node.querySelector('.trip-status-pill');
+      const copyBtn = node.querySelector('.trip-copy-link');
+      const makePublicBtn = node.querySelector('.trip-make-public');
+
+      const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
+      if (trip.is_public) {
+        statusPill.textContent = 'Public';
+        statusPill.className = 'trip-status-pill public';
+        copyBtn.style.display = 'inline-flex';
+        makePublicBtn.style.display = 'none';
+        copyBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!link) {
+            UI.showToast('No link yet', 'info');
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(link);
+            UI.showToast('Link copied', 'success');
+          } catch (err) {
+            console.error(err);
+            UI.showToast('Copy failed', 'error');
+          }
+        };
+      } else {
+        statusPill.textContent = 'Private';
+        statusPill.className = 'trip-status-pill private';
+        copyBtn.style.display = 'none';
+        makePublicBtn.style.display = 'inline-flex';
+        makePublicBtn.onclick = (e) => {
+          e.stopPropagation();
+          App.openTripDetails(trip.id);
+        };
+      }
       const detailsBtn = node.querySelector('.trip-details-btn');
       if (detailsBtn) {
-        detailsBtn.onclick = () => App.openTripDetails(trip.id);
+        detailsBtn.onclick = (e) => { e.stopPropagation(); App.openTripDetails(trip.id); };
       }
+      item.addEventListener('click', () => App.loadTrip(trip.id));
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          App.loadTrip(trip.id);
+        }
+      });
       container.appendChild(node);
     });
   },
