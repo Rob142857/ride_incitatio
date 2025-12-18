@@ -16,6 +16,7 @@ const UI = {
     this.bindMenu();
     this.bindModals();
     this.bindForms();
+    this.bindPullToRefresh();
     this.bindPlaceSearch();
     this.bindFullscreen();
     const attachmentList = document.getElementById('noteAttachmentList');
@@ -40,6 +41,52 @@ const UI = {
     attach('refreshWaypointsBtn', 'waypoints');
     attach('refreshJournalBtn', 'journal');
     attach('refreshTripsBtn', 'trips');
+  },
+
+  bindPullToRefresh() {
+    const addPTR = (elementId, view) => {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      let startY = 0;
+      let pulling = false;
+      let triggered = false;
+      const threshold = 60;
+
+      const onStart = (e) => {
+        if (el.scrollTop > 0) return;
+        startY = e.touches?.[0]?.clientY ?? 0;
+        pulling = true;
+        triggered = false;
+      };
+
+      const onMove = (e) => {
+        if (!pulling) return;
+        const currentY = e.touches?.[0]?.clientY ?? 0;
+        const delta = currentY - startY;
+        if (delta > 10 && el.scrollTop <= 0) {
+          // Prevent native overscroll bounce while pulling
+          e.preventDefault();
+        }
+        if (delta > threshold && !triggered) {
+          triggered = true;
+          App.refreshData(view);
+        }
+      };
+
+      const onEnd = () => {
+        pulling = false;
+        triggered = false;
+      };
+
+      el.addEventListener('touchstart', onStart, { passive: true });
+      el.addEventListener('touchmove', onMove, { passive: false });
+      el.addEventListener('touchend', onEnd, { passive: true });
+      el.addEventListener('touchcancel', onEnd, { passive: true });
+    };
+
+    addPTR('waypointsList', 'waypoints');
+    addPTR('journalList', 'journal');
+    addPTR('tripsList', 'trips');
   },
 
   /**

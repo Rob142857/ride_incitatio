@@ -33,6 +33,20 @@ const Trip = {
   },
 
   /**
+   * Normalize waypoint ordering (maps sort_order -> order and sorts array)
+   */
+  normalizeWaypointOrder(waypoints = []) {
+    return (Array.isArray(waypoints) ? waypoints : []).map((wp, idx) => {
+      const order = Number.isFinite(wp.order)
+        ? wp.order
+        : Number.isFinite(wp.sort_order)
+          ? wp.sort_order
+          : idx;
+      return { ...wp, order };
+    }).sort((a, b) => a.order - b.order);
+  },
+
+  /**
    * Create a waypoint object
    */
   createWaypoint(data) {

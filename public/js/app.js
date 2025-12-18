@@ -731,6 +731,9 @@ const App = {
     const normalized = { ...trip };
     if (!normalized.updatedAt && normalized.updated_at) normalized.updatedAt = normalized.updated_at;
     if (!normalized.createdAt && normalized.created_at) normalized.createdAt = normalized.created_at;
+    if (normalized.waypoints) {
+      normalized.waypoints = Trip.normalizeWaypointOrder(normalized.waypoints);
+    }
     return normalized;
   },
 
@@ -921,6 +924,9 @@ const App = {
   loadTripData(trip) {
     // Normalize share settings for downstream sharing UI
     Trip.ensureShareSettings(trip);
+    if (trip.waypoints) {
+      trip.waypoints = Trip.normalizeWaypointOrder(trip.waypoints);
+    }
     this.attachJournalAttachments(trip);
     this.currentTrip = trip;
     
@@ -993,7 +999,7 @@ const App = {
       if (sharedData) {
         // Create a temporary trip from shared data
         const trip = Trip.create(sharedData.name);
-        trip.waypoints = sharedData.waypoints || [];
+        trip.waypoints = Trip.normalizeWaypointOrder(sharedData.waypoints || []);
         trip.journal = sharedData.journal || [];
         trip.customRoutePoints = sharedData.customRoutePoints || [];
         trip.share_id = sharedData.share_id;
@@ -1064,6 +1070,7 @@ const App = {
       waypoint = await API.waypoints.add(this.currentTrip.id, data);
       if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
       this.currentTrip.waypoints.push(waypoint);
+      this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
     } catch (error) {
       console.error('Failed to add waypoint to cloud:', error);
       UI.showToast('Could not add waypoint (not saved)', 'error');

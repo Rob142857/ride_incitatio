@@ -1124,6 +1124,21 @@ body.ride-mode {
   border-bottom: 1px solid var(--border);
 }
 
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heading-refresh {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 14px;
+  line-height: 1;
+}
+
 .panel-header h2 {
   font-size: 1.25rem;
   font-weight: 600;
