@@ -564,9 +564,23 @@ const App = {
     this.createNewTrip();
   },
 
+  normalizeTrip(trip) {
+    if (!trip) return trip;
+    const normalized = { ...trip };
+    if (!normalized.updatedAt && normalized.updated_at) normalized.updatedAt = normalized.updated_at;
+    if (!normalized.createdAt && normalized.created_at) normalized.createdAt = normalized.created_at;
+    return normalized;
+  },
+
+  getTripSortTimestamp(trip) {
+    const ts = trip?.updatedAt || trip?.updated_at || trip?.createdAt || trip?.created_at;
+    return ts ? new Date(ts).getTime() : 0;
+  },
+
   applyTripOrder(trips) {
+    const normalizedTrips = trips.map((t) => this.normalizeTrip(t));
     const order = Storage.getTripOrder() || [];
-    const byId = new Map(trips.map((t) => [t.id, t]));
+    const byId = new Map(normalizedTrips.map((t) => [t.id, t]));
     const seen = new Set();
     const ordered = [];
 
@@ -578,9 +592,9 @@ const App = {
       }
     });
 
-    const remaining = trips
+    const remaining = normalizedTrips
       .filter((t) => !seen.has(t.id))
-      .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+      .sort((a, b) => this.getTripSortTimestamp(b) - this.getTripSortTimestamp(a));
 
     const finalList = [...ordered, ...remaining];
     Storage.setTripOrder(finalList.map((t) => t.id));
@@ -790,9 +804,12 @@ const App = {
         trip.description = description;
         trip.is_public = isPublic;
         trip.cover_image_url = coverImageUrl;
+        trip.updatedAt = new Date().toISOString();
         Storage.saveTrip(trip);
         updatedTrip = trip;
       }
+
+      updatedTrip = this.normalizeTrip(updatedTrip);
 
       this.loadTripDataIfCurrent(updatedTrip);
       this.refreshTripsList();
@@ -818,8 +835,9 @@ const App = {
   },
 
   loadTripDataIfCurrent(trip) {
-    if (this.currentTrip?.id === trip.id) {
-      this.loadTripData(trip);
+    const normalized = this.normalizeTrip(trip);
+    if (this.currentTrip?.id === normalized?.id) {
+      this.loadTripData(normalized);
     }
   },
 
@@ -1256,7 +1274,8 @@ const App = {
       return;
     }
 
-    const orderedTrips = this.applyTripOrder(trips);
+    const normalized = trips.map((t) => this.normalizeTrip(t));
+    const orderedTrips = this.applyTripOrder(normalized);
     this.tripListCache = orderedTrips;
     UI.renderTrips(orderedTrips, currentId);
   },
