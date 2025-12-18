@@ -241,11 +241,16 @@ const UI = {
     const content = document.getElementById('noteContent').value.trim();
     const isPrivate = document.getElementById('notePrivate').checked;
     const tagsStr = document.getElementById('noteTags').value.trim();
+    const entryId = document.getElementById('noteEntryId').value.trim();
     const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(t => t) : [];
 
-    App.addJournalEntry({ title, content, isPrivate, tags });
+    if (entryId) {
+      App.updateJournalEntry(entryId, { title, content, isPrivate, tags });
+    } else {
+      App.addJournalEntry({ title, content, isPrivate, tags });
+    }
     this.closeModal('noteModal');
-    this.showToast('Note added', 'success');
+    this.showToast(entryId ? 'Note updated' : 'Note added', 'success');
   },
 
   /**
@@ -449,12 +454,23 @@ const UI = {
             </div>
           ` : ''}
           <div class="journal-actions">
-            <button class="icon-btn" onclick="App.deleteJournalEntry('${entry.id}')" aria-label="Delete entry">
+            <button class="icon-btn" onclick="App.pickJournalAttachment('${entry.id}'); event.stopPropagation();" aria-label="Attach file">
+              📎
+            </button>
+            <button class="icon-btn" onclick="App.deleteJournalEntry('${entry.id}'); event.stopPropagation();" aria-label="Delete entry">
               <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             </button>
           </div>
         </div>
       `).join('');
+    
+      container.querySelectorAll('.journal-entry').forEach((el) => {
+        el.addEventListener('click', () => {
+          const id = el.dataset.id;
+          if (!id) return;
+          App.startEditJournalEntry(id);
+        });
+      });
   },
 
   /**
@@ -484,13 +500,15 @@ const UI = {
 
     normalizedTrips.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0)).forEach(trip => {
       const stats = Trip.getStats(trip);
+      const waypointCount = Number.isFinite(trip.waypoint_count) ? trip.waypoint_count : stats.waypointCount;
+      const journalCount = Number.isFinite(trip.journal_count) ? trip.journal_count : stats.journalCount;
       const node = template.content.cloneNode(true);
       const item = node.querySelector('.trip-item');
       item.dataset.id = trip.id;
       if (trip.id === currentTripId) item.classList.add('active');
       item.tabIndex = 0;
       node.querySelector('.trip-name').textContent = this.escapeHtml(trip.name);
-      node.querySelector('.trip-meta').innerHTML = `<span>📍 ${stats.waypointCount} waypoints</span> <span>📝 ${stats.journalCount} notes</span>`;
+      node.querySelector('.trip-meta').innerHTML = `<span>📍 ${waypointCount} waypoints</span> <span>📝 ${journalCount} notes</span>`;
       const statusPill = node.querySelector('.trip-status-pill');
       const copyBtn = node.querySelector('.trip-copy-link');
       const makePublicBtn = node.querySelector('.trip-make-public');

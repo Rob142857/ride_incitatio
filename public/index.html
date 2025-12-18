@@ -238,6 +238,7 @@
         </div>
         <p class="modal-subtitle">Capture a memory or reminder for this trip.</p>
         <form id="noteForm">
+          <input type="hidden" id="noteEntryId">
           <input type="text" id="noteTitle" placeholder="Entry title" required>
           <textarea id="noteContent" placeholder="Write your notes..." rows="6"></textarea>
           <div class="visibility-toggle">
@@ -247,6 +248,15 @@
             </label>
           </div>
           <input type="text" id="noteTags" placeholder="Tags (comma separated)">
+          <div class="field-row">
+            <label class="field-label">Attach a file</label>
+            <div class="pill-actions">
+              <input type="file" id="journalAttachmentFile" class="hidden">
+              <button type="button" class="secondary-btn" id="journalAttachmentBtn">Choose file</button>
+              <span class="microcopy" id="journalAttachmentFileName"></span>
+            </div>
+            <p class="microcopy">Upload to the current note after saving.</p>
+          </div>
           <div class="modal-actions">
             <button type="button" class="cancel-btn" data-close>Cancel</button>
             <button type="submit" class="primary-btn">Save</button>

@@ -155,6 +155,11 @@ const Storage = {
       this.saveSettings(data.settings);
     }
     return true;
+  },
+
+  clearTrips() {
+    this.saveTrips([]);
+    this.remove(this.KEYS.CURRENT_TRIP);
   }
 };
 

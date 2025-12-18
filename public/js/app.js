@@ -47,6 +47,7 @@ const App = {
     // Bind user button
     this.bindUserButton();
     this.bindTripDetails();
+    this.bindEvents();
     this.bindSessionRefresh();
     
     if (authError) {
@@ -169,6 +170,55 @@ const App = {
 
   },
 
+  bindJournalAttachmentPicker() {
+    const fileInput = document.getElementById('journalAttachmentFile');
+    const fileBtn = document.getElementById('journalAttachmentBtn');
+    const fileName = document.getElementById('journalAttachmentFileName');
+    if (!fileInput || !fileBtn || !fileName) return;
+
+    fileBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      fileInput.dataset.entryId = document.getElementById('noteEntryId')?.value || '';
+      fileName.textContent = '';
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async () => {
+      const entryId = fileInput.dataset.entryId;
+      const file = fileInput.files?.[0];
+      fileName.textContent = file ? file.name : '';
+      if (!file || !entryId) return;
+      await this.uploadJournalAttachment(entryId, file);
+    });
+  },
+
+  startEditJournalEntry(entryId) {
+    if (!this.currentTrip) return;
+    const entry = (this.currentTrip.journal || []).find((e) => e.id === entryId);
+    if (!entry) return;
+    const titleEl = document.getElementById('noteTitle');
+    const contentEl = document.getElementById('noteContent');
+    const privateEl = document.getElementById('notePrivate');
+    const tagsEl = document.getElementById('noteTags');
+    const idEl = document.getElementById('noteEntryId');
+    if (titleEl) titleEl.value = entry.title || '';
+    if (contentEl) contentEl.value = entry.content || '';
+    if (privateEl) privateEl.checked = !!entry.isPrivate;
+    if (tagsEl) tagsEl.value = (entry.tags || []).join(', ');
+    if (idEl) idEl.value = entry.id;
+    UI.openModal('noteModal');
+  },
+
+  pickJournalAttachment(entryId) {
+    const fileInput = document.getElementById('journalAttachmentFile');
+    const fileName = document.getElementById('journalAttachmentFileName');
+    if (!fileInput) return;
+    fileInput.dataset.entryId = entryId;
+    fileInput.value = '';
+    if (fileName) fileName.textContent = '';
+    fileInput.click();
+  },
+
   bindSessionRefresh() {
     // Re-verify session and refresh trips when returning to the app or regaining connectivity
     document.addEventListener('visibilitychange', async () => {
@@ -186,6 +236,10 @@ const App = {
         this.refreshTripsList();
       }
     });
+  },
+
+  bindEvents() {
+    this.bindJournalAttachmentPicker();
   },
 
   formatDistance(meters) {
@@ -434,11 +488,19 @@ const App = {
     const dropdown = document.querySelector('.user-dropdown');
     if (dropdown) dropdown.remove();
     
+    // Clear local trips/cache on logout
+    Storage.clearTrips();
+    this.currentTrip = null;
+    MapManager.clear();
+    UI.renderWaypoints([]);
+    UI.renderJournal([]);
+    UI.updateTripTitle('');
+    UI.updateTripStats(null);
+    UI.renderTrips([], null);
+
     UI.showToast('Signed out', 'success');
     
-    // Reload to show local data
-    this.loadInitialTrip();
-    this.refreshTripsList();
+    // Do not auto-load local trips after logout
   },
 
   /**
@@ -477,7 +539,12 @@ const App = {
         this.fallbackToLocal();
       }
     } else {
-      this.fallbackToLocal();
+      // When not authenticated, skip creating/loading local trips; wait for login
+      UI.renderTrips([], null);
+      UI.renderWaypoints([]);
+      UI.renderJournal([]);
+      UI.updateTripTitle('');
+      UI.updateTripStats(null);
     }
   },
 
@@ -997,6 +1064,42 @@ const App = {
     return entry;
   },
 
+  async updateJournalEntry(entryId, data) {
+    if (!this.currentTrip) return;
+    let updated;
+    if (this.useCloud && this.currentUser) {
+      try {
+        updated = await API.journal.update(this.currentTrip.id, entryId, {
+          title: data.title,
+          content: data.content,
+          is_private: data.isPrivate,
+          tags: data.tags
+        });
+      } catch (error) {
+        console.error('Failed to update journal entry:', error);
+        UI.showToast('Note not updated in cloud.', 'error');
+        return null;
+      }
+    } else {
+      updated = Trip.updateJournalEntry(this.currentTrip, entryId, {
+        title: data.title,
+        content: data.content,
+        isPrivate: data.isPrivate,
+        tags: data.tags
+      });
+      Storage.saveTrip(this.currentTrip);
+    }
+
+    // Sync local array
+    if (updated) {
+      const idx = this.currentTrip.journal.findIndex((e) => e.id === entryId);
+      if (idx >= 0) this.currentTrip.journal[idx] = updated;
+    }
+
+    UI.renderJournal(this.currentTrip.journal);
+    return updated;
+  },
+
   /**
    * Delete journal entry
    */
@@ -1018,6 +1121,22 @@ const App = {
     
     UI.renderJournal(this.currentTrip.journal);
     UI.showToast('Note deleted', 'success');
+  },
+
+  async uploadJournalAttachment(entryId, file) {
+    if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Sign in to upload attachments', 'error');
+      return;
+    }
+    try {
+      UI.showToast('Uploading attachment...', 'info');
+      await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entryId });
+      UI.showToast('Attachment uploaded', 'success');
+    } catch (err) {
+      console.error('Attachment upload failed', err);
+      UI.showToast('Attachment upload failed', 'error');
+    }
   },
 
   /**
