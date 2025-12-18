@@ -24,16 +24,20 @@ const Share = {
       return;
     }
 
-    let shareUrl = '';
+    // Start with any server-provided link already on the trip (DB source)
+    let shareUrl = App.currentTrip?.short_url && App.currentTrip.is_public
+      ? App.currentTrip.short_url
+      : '';
 
-    // Cloud mode: generate short code + mark public via API
-    if (App.useCloud && App.currentUser) {
+    // Cloud mode: only hit API if we need to create/refresh (no short code yet or not public)
+    if (App.useCloud && App.currentUser && (!App.currentTrip.short_code || !App.currentTrip.is_public)) {
       try {
         const result = await API.trips.share(App.currentTrip.id);
         if (result?.shortCode) {
           App.currentTrip.short_code = result.shortCode;
+          App.currentTrip.short_url = result.shareUrl || `${window.location.origin.replace(/\/$/, '')}/${result.shortCode}`;
           App.currentTrip.is_public = true;
-          shareUrl = result.shareUrl || `${window.location.origin.replace(/\/$/, '')}/${result.shortCode}`;
+          shareUrl = App.currentTrip.short_url;
         }
       } catch (err) {
         console.error('Share link generation failed', err);
