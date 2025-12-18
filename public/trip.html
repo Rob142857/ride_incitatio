@@ -1525,6 +1525,7 @@
         }
 
         localStorage.removeItem(pendingImportKey);
+        localStorage.setItem('ride_imported_trip_id', baseTrip.id);
         setUseTripState('success', 'Added to your trips');
 
         setTimeout(() => {

@@ -688,9 +688,18 @@ const App = {
       // Load from cloud
       try {
         let trips = await API.trips.list();
+        const pendingImportedId = localStorage.getItem('ride_imported_trip_id');
 
         if (trips.length > 0) {
-          const trip = await API.trips.get(trips[0].id);
+          const targetId = (pendingImportedId && trips.some((t) => t.id === pendingImportedId))
+            ? pendingImportedId
+            : trips[0].id;
+
+          const trip = await API.trips.get(targetId);
+          if (pendingImportedId) {
+            localStorage.removeItem('ride_imported_trip_id');
+            this.bumpTripToTop(targetId);
+          }
           this.loadTripData(trip);
         } else {
           this.createNewTrip();
