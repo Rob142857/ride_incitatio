@@ -134,6 +134,13 @@ select:focus-visible {
   overflow-y: auto;
 }
 
+body.doc-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: auto;
+  min-height: 100vh;
+}
+
 .doc-shell {
   max-width: 960px;
   margin: 48px auto;
