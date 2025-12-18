@@ -16,6 +16,8 @@ const Trip = {
       route: null,
       customRoutePoints: [],
       journal: [],
+      is_public: false,
+      short_code: null,
       settings: {
         routingProfile: 'driving',
         avoidTolls: false,
@@ -170,11 +172,13 @@ const Trip = {
    * Calculate trip statistics
    */
   getStats(trip) {
+    const waypoints = Array.isArray(trip.waypoints) ? trip.waypoints : [];
+    const journal = Array.isArray(trip.journal) ? trip.journal : [];
     return {
-      waypointCount: trip.waypoints.length,
-      journalCount: trip.journal.length,
-      publicNotesCount: trip.journal.filter(e => !e.isPrivate).length,
-      privateNotesCount: trip.journal.filter(e => e.isPrivate).length
+      waypointCount: waypoints.length,
+      journalCount: journal.length,
+      publicNotesCount: journal.filter(e => !e.isPrivate).length,
+      privateNotesCount: journal.filter(e => e.isPrivate).length
     };
   },
 

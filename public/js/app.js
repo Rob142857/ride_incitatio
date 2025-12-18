@@ -8,6 +8,7 @@ const App = {
   useCloud: false, // Will be true when deployed to Cloudflare
   isSharedView: false,
   loginPromptShown: false,
+  tripDetailId: null,
 
   /**
    * Initialize the application
@@ -40,6 +41,7 @@ const App = {
     
     // Bind user button
     this.bindUserButton();
+    this.bindTripDetails();
     
     if (authError) {
       UI.showToast('Login failed. Please try again.', 'error');
@@ -110,6 +112,39 @@ const App = {
         UI.openModal('loginModal');
       }
     });
+  },
+
+  /**
+   * Bind trip details modal controls
+   */
+  bindTripDetails() {
+    const form = document.getElementById('tripDetailsForm');
+    const copyBtn = document.getElementById('tripDetailCopy');
+
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.saveTripDetails();
+      });
+    }
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const input = document.getElementById('tripDetailLink');
+        if (!input?.value) {
+          UI.showToast('No link to copy yet', 'info');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(input.value);
+          UI.showToast('Link copied', 'success');
+        } catch (err) {
+          console.error(err);
+          UI.showToast('Copy failed', 'error');
+        }
+      });
+    }
+
   },
 
   /**
@@ -254,6 +289,11 @@ const App = {
         return;
       } catch (error) {
         console.error('Failed to create cloud trip:', error);
+        UI.showToast('Session expired or offline. Using offline mode.', 'info');
+        // Fall back to local mode
+        this.useCloud = false;
+        this.currentUser = null;
+        this.updateUserUI();
       }
     }
     
@@ -267,6 +307,109 @@ const App = {
     this.refreshTripsList();
     
     UI.showToast('New trip created', 'success');
+  },
+
+  /**
+   * Open trip details modal for a trip
+   */
+  async openTripDetails(tripId) {
+    try {
+      let trip;
+      if (this.useCloud && this.currentUser) {
+        trip = await API.trips.get(tripId);
+      } else {
+        trip = Storage.getTrip(tripId);
+      }
+
+      if (!trip) {
+        UI.showToast('Trip not found', 'error');
+        return;
+      }
+
+      this.tripDetailId = tripId;
+      this.fillTripDetailsForm(trip);
+      UI.openModal('tripDetailsModal');
+    } catch (err) {
+      console.error('Open trip details failed:', err);
+      UI.showToast('Failed to load trip details', 'error');
+    }
+  },
+
+  fillTripDetailsForm(trip) {
+    document.getElementById('tripDetailName').value = trip.name || '';
+    document.getElementById('tripDetailDescription').value = trip.description || '';
+    document.getElementById('tripDetailPublic').checked = !!trip.is_public;
+    const linkInput = document.getElementById('tripDetailLink');
+    const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
+    linkInput.value = link || '';
+    document.getElementById('tripDetailsModal').dataset.tripId = trip.id;
+  },
+
+  async saveTripDetails() {
+    const name = document.getElementById('tripDetailName').value.trim();
+    const description = document.getElementById('tripDetailDescription').value.trim();
+    const isPublic = document.getElementById('tripDetailPublic').checked;
+    const tripId = this.tripDetailId;
+
+    if (!tripId) {
+      UI.showToast('No trip selected', 'error');
+      return;
+    }
+
+    if (!name) {
+      UI.showToast('Name is required', 'error');
+      return;
+    }
+
+    try {
+      let updatedTrip;
+      if (this.useCloud && this.currentUser) {
+        await API.trips.update(tripId, { name, description, is_public: isPublic });
+
+        // Ensure short link exists when public (fixed code per trip)
+        if (isPublic) {
+          const share = await API.trips.share(tripId);
+          updatedTrip = await API.trips.get(tripId);
+          updatedTrip.short_url = share.shareUrl;
+          updatedTrip.short_code = share.shortCode;
+        } else {
+          updatedTrip = await API.trips.get(tripId);
+        }
+      } else {
+        const trip = Storage.getTrip(tripId);
+        if (!trip) {
+          UI.showToast('Trip not found', 'error');
+          return;
+        }
+        trip.name = name;
+        trip.description = description;
+        trip.is_public = isPublic;
+        Storage.saveTrip(trip);
+        updatedTrip = trip;
+      }
+
+      this.loadTripDataIfCurrent(updatedTrip);
+      this.refreshTripsList();
+      this.fillTripDetailsForm(updatedTrip);
+      UI.showToast('Trip updated', 'success');
+      UI.closeModal('tripDetailsModal');
+    } catch (err) {
+      console.error('Save trip details failed:', err);
+      UI.showToast('Failed to save trip', 'error');
+    }
+  },
+
+  async generateTripLink() {
+    const tripId = this.tripDetailId;
+    if (!tripId) return;
+
+    // Auto-generation now handled during save when public
+  },
+
+  loadTripDataIfCurrent(trip) {
+    if (this.currentTrip?.id === trip.id) {
+      this.loadTripData(trip);
+    }
   },
 
   /**

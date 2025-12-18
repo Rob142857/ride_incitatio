@@ -383,7 +383,13 @@ const UI = {
 
     container.innerHTML = '';
     const template = document.getElementById('tripItemTemplate');
-    trips.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).forEach(trip => {
+    const normalizedTrips = trips.map((trip) => ({
+      ...trip,
+      waypoints: Array.isArray(trip.waypoints) ? trip.waypoints : [],
+      journal: Array.isArray(trip.journal) ? trip.journal : [],
+    }));
+
+    normalizedTrips.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0)).forEach(trip => {
       const stats = Trip.getStats(trip);
       const node = template.content.cloneNode(true);
       const item = node.querySelector('.trip-item');
@@ -396,6 +402,10 @@ const UI = {
       toggle.onchange = (e) => {
         App.setTripPublic(trip.id, e.target.checked);
       };
+      const detailsBtn = node.querySelector('.trip-details-btn');
+      if (detailsBtn) {
+        detailsBtn.onclick = () => App.openTripDetails(trip.id);
+      }
       container.appendChild(node);
     });
   },

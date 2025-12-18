@@ -22,7 +22,12 @@ export const TripsHandler = {
        ORDER BY t.updated_at DESC`
     ).bind(user.id).all();
     
-    return jsonResponse({ trips: trips.results });
+    const results = (trips.results || []).map((t) => ({
+      ...t,
+      short_url: t.short_code ? `${BASE_URL}/${t.short_code}` : null
+    }));
+
+    return jsonResponse({ trips: results });
   },
   
   /**
@@ -537,11 +542,15 @@ export const TripsHandler = {
     
     // Look up by short code
     const trip = await env.DB.prepare(
-      'SELECT * FROM trips WHERE short_code = ? AND is_public = 1'
+      'SELECT * FROM trips WHERE short_code = ?'
     ).bind(params.shortCode).first();
     
     if (!trip) {
       return errorResponse('Trip not found or not shared', 404);
+    }
+
+    if (!trip.is_public) {
+      return errorResponse('Trip is not public', 403);
     }
     
     // Get waypoints

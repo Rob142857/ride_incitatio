@@ -26,7 +26,7 @@
   <meta name="twitter:image" content="https://ride.incitat.io/icons/og-default.png">
   
   <!-- Favicons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -757,7 +757,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
         </svg>
       </a>
-      <p class="footer-credits">Crafted with care by Robert Evans of <a href="https://objectiveartefacts.com.au" target="_blank" rel="noopener">Objective Artefacts Australia</a></p>
+      <p class="footer-credits">Crafted with Care<br><a href="https://objectiveartefacts.com.au" target="_blank" rel="noopener">Objective Artefacts Australia</a><br><a href="https://incitat.io" target="_blank" rel="noopener">incitat.io</a></p>
     </footer>
     
   </main>
@@ -774,31 +774,10 @@
   
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/js/api.js"></script>
   
   <script>
-    // Get short code from URL - supports both /abc123 and /trip/abc123
-    const pathParts = window.location.pathname.split('/').filter(p => p);
-    const shortCode = pathParts[pathParts.length - 1];
-    
     let map = null;
-    
-    async function loadTrip() {
-      try {
-        const response = await fetch(`/api/s/${shortCode}`);
-        
-        if (!response.ok) {
-          showError();
-          return;
-        }
-        
-        const data = await response.json();
-        renderTrip(data.trip);
-        
-      } catch (error) {
-        console.error('Failed to load trip:', error);
-        showError();
-      }
-    }
     
     function showError() {
       document.getElementById('loading').style.display = 'none';
@@ -1081,22 +1060,47 @@
     }
 
     const shortCode = getShortCodeFromUrl();
-    if (shortCode) {
-      // Use API.shared.get to fetch trip by short code
-      API.shared.get(shortCode).then(trip => {
-        if (trip) {
-          window.trip = trip;
-          renderTrip(trip);
-        } else {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('error').style.display = 'block';
+
+    function showError(title = 'Trip Not Found', message = 'This trip may have been removed or the link is incorrect.') {
+      document.getElementById('loading').style.display = 'none';
+      const errorEl = document.getElementById('error');
+      errorEl.querySelector('.error-title').textContent = title;
+      errorEl.querySelector('.error-message').textContent = message;
+      errorEl.style.display = 'flex';
+    }
+
+    function showPrivate() {
+      showError('Trip Is Private', 'The creator has not shared this trip publicly yet.');
+    }
+
+    async function loadPublicTrip(code) {
+      try {
+        const res = await fetch(`/api/s/${code}`);
+        if (res.status === 403) {
+          showPrivate();
+          return;
         }
-      }).catch(() => {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('error').style.display = 'block';
-      });
+        if (!res.ok) {
+          showError();
+          return;
+        }
+        const data = await res.json();
+        if (!data?.trip) {
+          showError();
+          return;
+        }
+        window.trip = data.trip;
+        renderTrip(data.trip);
+      } catch (err) {
+        console.error('Failed to load trip:', err);
+        showError();
+      }
+    }
+
+    if (shortCode) {
+      loadPublicTrip(shortCode);
     } else {
-      loadTrip();
+      showError();
     }
   </script>
   

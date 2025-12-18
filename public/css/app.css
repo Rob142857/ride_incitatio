@@ -605,20 +605,70 @@ body {
   pointer-events: auto;
 }
 
+/* Allow map click-through while picking a waypoint */
+.map-pick-mode .modal:not(.hidden) {
+  pointer-events: none;
+}
+
+.map-pick-mode .modal:not(.hidden) .modal-content {
+  pointer-events: auto;
+}
+
 .modal-content {
-  background: var(--bg-secondary);
-  border-radius: 4px;
+  background: linear-gradient(160deg, var(--bg-secondary), var(--bg-primary));
+  border-radius: 14px;
   padding: 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 40px var(--shadow);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .modal-content h3 {
-  font-size: 1.25rem;
-  margin-bottom: 16px;
+  font-size: 1.2rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.modal-close:active {
+  transform: scale(0.96);
+}
+
+.modal-subtitle {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .modal-content input,
@@ -627,11 +677,12 @@ body {
   width: 100%;
   padding: 12px;
   margin-bottom: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .modal-content input:focus,
@@ -639,11 +690,49 @@ body {
 .modal-content select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
 }
 
 .modal-content textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.share-link-block {
+  margin: 12px 0 8px;
+}
+
+.share-link-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.microcopy {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.modal-content input::placeholder,
+.modal-content textarea::placeholder {
+  color: var(--text-muted);
 }
 
 .coord-inputs {
@@ -676,6 +765,11 @@ body {
   margin-top: 16px;
 }
 
+.modal-actions .primary-btn,
+.modal-actions .cancel-btn {
+  min-width: 110px;
+}
+
 /* Share Modal Specific */
 .share-link-container {
   display: flex;
@@ -685,6 +779,7 @@ body {
 
 .share-link-container input {
   margin-bottom: 0;
+  font-family: var(--font-mono, monospace);
 }
 
 .share-visibility {
@@ -787,12 +882,12 @@ body {
 .share-btn {
   flex: 1;
   min-width: 120px;
-  padding: 12px;
+  padding: 12px 14px;
   background: var(--accent);
   color: var(--text-primary);
   border: none;
-  border-radius: 3px;
-  font-size: 0.9rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -992,6 +1087,24 @@ body {
   color: var(--text-secondary);
   display: flex;
   gap: 16px;
+}
+
+.trip-actions-row {
+  margin-top: 8px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 6px 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.link-btn:hover {
+  color: var(--accent-hover);
 }
 
 /* Floating Button */

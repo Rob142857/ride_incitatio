@@ -79,9 +79,18 @@ const MapManager = {
       // Update the modal inputs if open
       const latInput = document.getElementById('waypointLat');
       const lngInput = document.getElementById('waypointLng');
+      const modal = document.getElementById('waypointModal');
+      if (modal && modal.classList.contains('hidden')) {
+        UI.openModal('waypointModal');
+      }
       if (latInput && lngInput) {
         latInput.value = e.latlng.lat.toFixed(6);
         lngInput.value = e.latlng.lng.toFixed(6);
+      }
+      const nameInput = document.getElementById('waypointName');
+      if (nameInput && !nameInput.value.trim()) {
+        const nextNum = (App.currentTrip?.waypoints?.length || 0) + 1;
+        nameInput.value = `Waypoint ${nextNum}`;
       }
 
       // Show temporary marker
@@ -101,6 +110,7 @@ const MapManager = {
   enableAddWaypointMode() {
     this.isAddingWaypoint = true;
     this.map.getContainer().style.cursor = 'crosshair';
+    document.body.classList.add('map-pick-mode');
     UI.showToast('Tap on map to set location', 'info');
   },
 
@@ -111,6 +121,7 @@ const MapManager = {
     this.isAddingWaypoint = false;
     this.map.getContainer().style.cursor = '';
     this.pendingLocation = null;
+    document.body.classList.remove('map-pick-mode');
     
     if (this.tempMarker) {
       this.map.removeLayer(this.tempMarker);
