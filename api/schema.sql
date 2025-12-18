@@ -111,3 +111,18 @@ CREATE INDEX IF NOT EXISTS idx_journal_trip ON journal_entries(trip_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_trip ON attachments(trip_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_journal ON attachments(journal_entry_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_waypoint ON attachments(waypoint_id);
+
+-- Login audit table (lightweight)
+CREATE TABLE IF NOT EXISTS login_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  email TEXT,
+  provider TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_events_created ON login_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_events_user ON login_events(user_id);

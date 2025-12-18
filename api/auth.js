@@ -107,7 +107,7 @@ export const AuthHandler = {
    * Handle OAuth callback from provider
    */
   async handleCallback(context) {
-    const { params, env, url } = context;
+    const { params, env, url, request } = context;
     const providerName = params.provider;
     
     const provider = PROVIDERS[providerName];
@@ -199,6 +199,11 @@ export const AuthHandler = {
       name: user.name,
       avatar_url: user.avatar_url
     });
+
+    // Lightweight audit log
+    recordLogin(env, user, providerName, request).catch((err) => {
+      console.error('login audit failed', err);
+    });
     
     // Redirect to app with session cookie
     const returnUrl = stateData.returnUrl || '/';
@@ -231,8 +236,61 @@ export const AuthHandler = {
     
     const response = jsonResponse({ success: true });
     return clearSessionCookie(response);
+  },
+
+  /**
+   * Admin: list users (to be Zero Trust protected upstream)
+   */
+  async listUsersAdmin(context) {
+    const { env, request } = context;
+
+    // Optional header gate if ADMIN_KEY is set
+    if (env.ADMIN_KEY) {
+      const provided = request.headers.get('x-admin-key');
+      if (!provided || provided !== env.ADMIN_KEY) {
+        return errorResponse('Unauthorized', 401);
+      }
+    }
+
+    const result = await env.DB.prepare(
+      'SELECT id, email, name, provider, provider_id, created_at, updated_at, last_login FROM users ORDER BY created_at DESC'
+    ).all();
+
+    return jsonResponse({ users: result.results || [] });
+  },
+
+  /**
+   * Admin: recent login events (lightweight audit)
+   */
+  async listLoginsAdmin(context) {
+    const { env, request } = context;
+
+    if (env.ADMIN_KEY) {
+      const provided = request.headers.get('x-admin-key');
+      if (!provided || provided !== env.ADMIN_KEY) {
+        return errorResponse('Unauthorized', 401);
+      }
+    }
+
+    const result = await env.DB.prepare(
+      'SELECT id, user_id, email, provider, ip, user_agent, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'
+    ).all();
+
+    return jsonResponse({ events: result.results || [] });
   }
 };
+
+async function recordLogin(env, user, provider, request) {
+  const ip = request.headers.get('cf-connecting-ip')
+    || request.headers.get('x-forwarded-for')
+    || 'unknown';
+  const userAgent = request.headers.get('user-agent') || '';
+  const id = generateId();
+
+  await env.DB.prepare(
+    'INSERT INTO login_events (id, user_id, email, provider, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(id, user.id, user.email, provider, ip, userAgent).run();
+}
 
 /**
  * Create or update user in database
@@ -240,26 +298,36 @@ export const AuthHandler = {
 async function createOrUpdateUser(db, userData) {
   const { email, name, avatar_url, provider, provider_id } = userData;
   const normalizedEmail = email?.toLowerCase();
-  
-  // Check if user exists
-  const existing = await db.prepare(
+
+  // First try provider+id match
+  const existingByProvider = await db.prepare(
     'SELECT * FROM users WHERE provider = ? AND provider_id = ?'
   ).bind(provider, provider_id).first();
-  
-  if (existing) {
-    // Update existing user
+
+  if (existingByProvider) {
     await db.prepare(
-      'UPDATE users SET email = ?, name = ?, avatar_url = ?, updated_at = datetime("now") WHERE id = ?'
-    ).bind(normalizedEmail, name, avatar_url, existing.id).run();
-    
-    return { ...existing, email: normalizedEmail, name, avatar_url };
+      'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+    ).bind(normalizedEmail, name, avatar_url, existingByProvider.id).run();
+    return { ...existingByProvider, email: normalizedEmail, name, avatar_url, last_login: new Date().toISOString() };
   }
-  
+
+  // Then try email match to merge accounts across providers
+  const existingByEmail = await db.prepare(
+    'SELECT * FROM users WHERE email = ?'
+  ).bind(normalizedEmail).first();
+
+  if (existingByEmail) {
+    await db.prepare(
+      'UPDATE users SET provider = ?, provider_id = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+    ).bind(provider, provider_id, name, avatar_url, existingByEmail.id).run();
+    return { ...existingByEmail, provider, provider_id, name, avatar_url, last_login: new Date().toISOString() };
+  }
+
   // Create new user
   const id = generateId();
   await db.prepare(
-    'INSERT INTO users (id, email, name, avatar_url, provider, provider_id) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO users (id, email, name, avatar_url, provider, provider_id, last_login) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
   ).bind(id, normalizedEmail, name, avatar_url, provider, provider_id).run();
   
-  return { id, email: normalizedEmail, name, avatar_url, provider, provider_id };
+  return { id, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
 }

@@ -19,6 +19,8 @@ router.get('/api/auth/login/:provider', AuthHandler.initiateLogin);
 router.get('/api/auth/callback/:provider', AuthHandler.handleCallback);
 router.get('/api/auth/me', requireAuth, AuthHandler.getCurrentUser);
 router.post('/api/auth/logout', AuthHandler.logout);
+router.get('/api/admin/users', AuthHandler.listUsersAdmin);
+router.get('/api/admin/logins', AuthHandler.listLoginsAdmin);
 
 // Trip routes (protected)
 router.get('/api/trips', requireAuth, TripsHandler.listTrips);
