@@ -22,6 +22,15 @@
       padding: 24px;
       box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
     }
+    .confirm-input {
+      width: 100%;
+      padding: 10px 12px;
+      margin: 8px 0 4px;
+      background: #0b0e14;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e5e7eb;
+    }
     .danger-box {
       margin-top: 24px;
       padding: 16px;
@@ -72,7 +81,8 @@
   <p>We will verify ownership and delete your data within 30 days, usually much sooner.</p>
 
   <div class="danger-box">
-    <p>You can also delete everything yourself right now (trips, waypoints, notes, attachments). This only works when you are signed in.</p>
+    <p>You can also delete everything yourself right now (trips, waypoints, notes, attachments). Sign in first, then type <strong>DELETE</strong> to proceed.</p>
+    <input id="deleteConfirm" class="confirm-input" type="text" placeholder="Type DELETE to confirm" autocomplete="off" aria-label="Type DELETE to confirm" />
     <button id="deleteDataBtn" class="danger-btn" type="button">Delete my Ride data</button>
     <p id="deleteStatus" class="status" aria-live="polite"></p>
   </div>
@@ -92,18 +102,102 @@
 
     <p>If you have questions, contact <strong>support@ride.incitat.io</strong>.</p>
   </div>
+  
+  <!-- Login Modal reused from main app -->
+  <div id="loginModal" class="modal hidden">
+    <div class="modal-content login-modal">
+      <div class="modal-header">
+        <h3>Welcome to Ride</h3>
+        <button type="button" class="modal-close" data-close-login aria-label="Close">×</button>
+      </div>
+      <p class="modal-subtitle">Sign in to manage and delete your data.</p>
+      <div class="login-buttons">
+        <a class="login-btn" data-login-provider="google" id="loginBtnGoogle">
+          <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </a>
+        <a class="login-btn" data-login-provider="facebook" id="loginBtnFacebook">
+          <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/></svg>
+          Continue with Facebook
+        </a>
+        <a class="login-btn" data-login-provider="microsoft" id="loginBtnMicrosoft">
+          <svg viewBox="0 0 24 24"><path d="M11.4 11.4H0V0h11.4v11.4z" fill="#F25022"/><path d="M24 11.4H12.6V0H24v11.4z" fill="#7FBA00"/><path d="M11.4 24H0V12.6h11.4V24z" fill="#00A4EF"/><path d="M24 24H12.6V12.6H24V24z" fill="#FFB900"/></svg>
+          Continue with Microsoft
+        </a>
+      </div>
+      <p class="login-note">We only access your email and name for account creation. Your trip data stays private.</p>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
   <script>
     (function() {
       const btn = document.getElementById('deleteDataBtn');
       const status = document.getElementById('deleteStatus');
+      const confirmInput = document.getElementById('deleteConfirm');
+      let authedUser = null;
 
       function setStatus(message, tone) {
         status.textContent = message;
         status.className = `status ${tone || ''}`.trim();
       }
 
+      function typedDeleteOk() {
+        return confirmInput && confirmInput.value.trim().toUpperCase() === 'DELETE';
+      }
+
+      function syncButtonState() {
+        const ready = !!authedUser && typedDeleteOk();
+        btn.disabled = !ready;
+      }
+
+      function setLoginLinks() {
+        const returnTo = window.location.href;
+        const providers = ['google', 'facebook', 'microsoft'];
+        providers.forEach((p) => {
+          const el = document.getElementById(`loginBtn${p.charAt(0).toUpperCase() + p.slice(1)}`);
+          if (el) el.href = API.auth.loginUrl(p, returnTo);
+        });
+      }
+
+      function openLoginModal() {
+        setLoginLinks();
+        const modal = document.getElementById('loginModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+
+      async function refreshAuthState() {
+        try {
+          authedUser = await API.auth.getUser();
+        } catch (err) {
+          authedUser = null;
+        }
+        syncButtonState();
+      }
+
       if (btn) {
         btn.addEventListener('click', async () => {
+          await refreshAuthState();
+          if (!authedUser) {
+            openLoginModal();
+            setStatus('Sign in to delete your data.', 'error');
+            return;
+          }
+
+          if (!typedDeleteOk()) {
+            setStatus('Type DELETE to confirm.', 'error');
+            return;
+          }
+
           const confirmDelete = window.confirm('Delete all your trips, waypoints, notes, and attachments? This cannot be undone.');
           if (!confirmDelete) return;
 
@@ -139,6 +233,27 @@
           }
         });
       }
+
+      if (confirmInput) {
+        confirmInput.addEventListener('input', () => {
+          syncButtonState();
+        });
+      }
+
+      document.querySelectorAll('[data-close-login]').forEach((btnEl) => {
+        btnEl.addEventListener('click', closeLoginModal);
+      });
+      const loginModalEl = document.getElementById('loginModal');
+      if (loginModalEl) {
+        loginModalEl.addEventListener('click', (e) => {
+          if (e.target.id === 'loginModal') {
+            closeLoginModal();
+          }
+        });
+      }
+
+      // Initial auth check on load to enable the button once signed in
+      refreshAuthState();
     })();
   </script>
 </body>
