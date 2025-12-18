@@ -274,22 +274,22 @@ const App = {
       document.getElementById('ridePhotoInput')?.click();
     });
 
+    document.getElementById('ridePickPhotoBtn')?.addEventListener('click', () => {
+      document.getElementById('rideAddSheet')?.classList.add('hidden');
+      document.getElementById('ridePhotoPickInput')?.click();
+    });
+
     // Handle photo capture
     document.getElementById('ridePhotoInput')?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
-      if (!file || !this.currentTrip) return;
-      if (!this.useCloud || !this.currentUser) {
-        UI.showToast('Login to save photos.', 'error');
-        return;
-      }
-      try {
-        UI.showToast('Uploading photo...', 'info');
-        await API.attachments.upload(this.currentTrip.id, file, {});
-        UI.showToast('Photo saved to trip', 'success');
-      } catch (err) {
-        console.error('Photo upload failed', err);
-        UI.showToast('Photo upload failed', 'error');
-      }
+      if (file) await this.addPhotoAttachment(file);
+      e.target.value = '';
+    });
+
+    // Handle photo pick from storage
+    document.getElementById('ridePhotoPickInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (file) await this.addPhotoAttachment(file);
       e.target.value = '';
     });
 
@@ -307,6 +307,42 @@ const App = {
     document.getElementById('rideBannerExitBtn')?.addEventListener('click', () => {
       this.exitRideMode();
     });
+  },
+
+  async addPhotoAttachment(file) {
+    if (!this.currentTrip) return;
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Login to save photos.', 'error');
+      return;
+    }
+
+    const title = `Photo ${new Date().toLocaleString()}`;
+    let entry;
+    try {
+      entry = await API.journal.add(this.currentTrip.id, {
+        title,
+        content: '',
+        is_private: false,
+        tags: []
+      });
+      if (!this.currentTrip.journal) this.currentTrip.journal = [];
+      this.currentTrip.journal.push(entry);
+    } catch (err) {
+      console.error('Failed to create photo note', err);
+      UI.showToast('Could not create note for photo.', 'error');
+      return;
+    }
+
+    try {
+      UI.showToast('Uploading photo...', 'info');
+      await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entry.id });
+      UI.showToast('Photo saved to trip', 'success');
+    } catch (err) {
+      console.error('Photo upload failed', err);
+      UI.showToast('Photo upload failed', 'error');
+    }
+
+    UI.renderJournal(this.currentTrip.journal);
   },
 
   formatDistance(meters) {
