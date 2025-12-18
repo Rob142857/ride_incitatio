@@ -17,9 +17,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
   
+  <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
+<body class="geistsans_47a3c9f1-module__2HyNMa__variable geistmono_cfbefb1d-module__tUxLBG__variable antialiased">
   <div id="app">
     <!-- Map Container -->
     <div id="map"></div>
@@ -105,6 +106,17 @@
         <h2>My Trips</h2>
       </div>
       <div id="tripsList" class="panel-content"></div>
+          <template id="tripItemTemplate">
+            <div class="trip-item" data-id="">
+              <div class="trip-name"></div>
+              <div class="trip-meta"></div>
+              <div class="trip-public-toggle">
+                <label class="public-toggle-label">
+                  <input type="checkbox" class="public-toggle-checkbox"> Publicly shared
+                </label>
+              </div>
+            </div>
+          </template>
     </section>
     
     <!-- Modals -->
@@ -167,10 +179,15 @@
             </button>
           </div>
           <div class="share-visibility">
-            <label>Include in shared view:</label>
-            <label><input type="checkbox" id="shareWaypoints" checked> Waypoints</label>
-            <label><input type="checkbox" id="shareRoute" checked> Route</label>
-            <label><input type="checkbox" id="sharePublicNotes" checked> Public notes</label>
+                        <div class="share-public-toggle" style="margin-bottom:8px;">
+                          <label class="public-toggle-label"><input type="checkbox" id="sharePublicToggle"> Publicly shared (anyone with link can view)</label>
+                        </div>
+            <div style="font-size:13px; font-weight:500; margin-bottom:6px;">Include in shared view:</div>
+            <div class="share-checkbox-group">
+              <label class="share-checkbox-label"><input type="checkbox" id="shareWaypoints" checked> <span>Waypoints</span></label>
+              <label class="share-checkbox-label"><input type="checkbox" id="shareRoute" checked> <span>Route</span></label>
+              <label class="share-checkbox-label"><input type="checkbox" id="sharePublicNotes" checked> <span>Public notes</span></label>
+            </div>
           </div>
           <div class="share-buttons">
             <button id="shareNativeBtn" class="share-btn">Share via...</button>

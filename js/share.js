@@ -6,6 +6,19 @@ const Share = {
    * Open share modal and generate link
    */
   openShareModal() {
+        // Set public toggle state
+        const publicToggle = document.getElementById('sharePublicToggle');
+        publicToggle.checked = !!App.currentTrip.is_public;
+        publicToggle.onchange = async (e) => {
+          try {
+            await API.trips.update(App.currentTrip.id, { is_public: e.target.checked });
+            App.currentTrip.is_public = e.target.checked;
+            UI.showToast(e.target.checked ? 'Trip is now public' : 'Trip is now private', 'success');
+          } catch {
+            UI.showToast('Failed to update sharing', 'error');
+            publicToggle.checked = !e.target.checked;
+          }
+        };
     if (!App.currentTrip) {
       UI.showToast('No trip to share', 'error');
       return;
@@ -15,14 +28,14 @@ const Share = {
     Trip.generateShareId(App.currentTrip);
     App.saveCurrentTrip();
 
-    // Generate shareable link
+    // Generate shareable link (root-level /shortcode)
     const shareId = App.currentTrip.shareSettings.shareId;
-    const baseUrl = window.location.origin + window.location.pathname;
-    const shareUrl = `${baseUrl}?trip=${shareId}`;
-    
+    const baseUrl = window.location.origin.replace(/\/$/, '');
+    const shareUrl = `${baseUrl}/${shareId}`;
+
     document.getElementById('shareLink').value = shareUrl;
     UI.openModal('shareModal');
-    
+
     this.bindShareModalEvents();
   },
 

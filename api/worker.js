@@ -84,8 +84,9 @@ export default {
         ).bind(shortCode).first();
         
         if (trip) {
-          // Valid short code - serve the trip page
+          // Valid short code - serve the trip page, passing short code as query param
           const newUrl = new URL('/trip.html', url.origin);
+          newUrl.searchParams.set('trip', shortCode);
           return env.ASSETS.fetch(new Request(newUrl, request));
         }
       } catch (error) {

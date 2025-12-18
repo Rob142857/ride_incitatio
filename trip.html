@@ -29,7 +29,6 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   
   <!-- Fonts -->
@@ -38,6 +37,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
+  <link rel="stylesheet" href="css/global.css">
     :root {
       --bg-primary: #0a0a0f;
       --bg-secondary: #12121a;
@@ -649,7 +649,7 @@
     }
   </style>
 </head>
-<body>
+<body class="geistsans_47a3c9f1-module__2HyNMa__variable geistmono_cfbefb1d-module__tUxLBG__variable antialiased">
   
   <!-- Loading State -->
   <div id="loading" class="loading">
@@ -1070,7 +1070,34 @@
     });
     
     // Load trip on page load
-    loadTrip();
+    // Support both /trip.html?trip=abc123 and /abc123 (via worker redirect)
+    function getShortCodeFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('trip')) return params.get('trip');
+      // Also support /abc123 by checking pathname
+      const match = window.location.pathname.match(/^\/?([a-zA-Z0-9]{6})$/);
+      if (match) return match[1];
+      return null;
+    }
+
+    const shortCode = getShortCodeFromUrl();
+    if (shortCode) {
+      // Use API.shared.get to fetch trip by short code
+      API.shared.get(shortCode).then(trip => {
+        if (trip) {
+          window.trip = trip;
+          renderTrip(trip);
+        } else {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'block';
+        }
+      }).catch(() => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+      });
+    } else {
+      loadTrip();
+    }
   </script>
   
 </body>

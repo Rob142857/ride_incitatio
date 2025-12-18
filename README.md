@@ -8,7 +8,7 @@ A stripped-down Progressive Web App for planning trips with waypoints, custom ro
 - 📍 **Waypoint Planning** - Add, reorder, and categorize waypoints (scenic, fuel, food, lodging, etc.)
 - 🗺️ **Route Customization** - Drag routes to adjust paths, automatic routing between waypoints
 - 📝 **Trip Journal** - Add notes with public/private visibility for sharing
-- 🔗 **Easy Sharing** - Generate shareable links, export to JSON/GPX
+- 🔗 **Easy Sharing** - Generate shareable links, export to JSON/GPX, easy collaboration
 - 📴 **Offline Support** - Works offline with cached map tiles
 
 ## Getting Started

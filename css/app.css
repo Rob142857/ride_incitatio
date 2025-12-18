@@ -1,3 +1,35 @@
+/* Public/Private Toggle Styles */
+.trip-public-toggle, .share-public-toggle {
+  margin-top: 8px;
+}
+.public-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.public-toggle-checkbox {
+  accent-color: #3b82f6;
+  width: 16px;
+  height: 16px;
+}
+/* Share Modal Checkbox Alignment */
+.share-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.share-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
 /* CSS Variables */
 :root {
   --bg-primary: #1a1a2e;
@@ -575,7 +607,7 @@ body {
 
 .modal-content {
   background: var(--bg-secondary);
-  border-radius: 16px;
+  border-radius: 4px;
   padding: 24px;
   width: 100%;
   max-width: 400px;
@@ -597,7 +629,7 @@ body {
   margin-bottom: 12px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 3px;
   color: var(--text-primary);
   font-size: 1rem;
 }
@@ -678,7 +710,7 @@ body {
   background: var(--accent);
   color: var(--text-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: 3px;
   font-size: 0.9rem;
   cursor: pointer;
   transition: background 0.2s;

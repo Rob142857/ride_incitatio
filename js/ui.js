@@ -381,22 +381,23 @@ const UI = {
       return;
     }
 
-    container.innerHTML = trips
-      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-      .map(trip => {
-        const stats = Trip.getStats(trip);
-        return `
-          <div class="trip-item ${trip.id === currentTripId ? 'active' : ''}" 
-               onclick="App.loadTrip('${trip.id}')"
-               data-id="${trip.id}">
-            <div class="trip-name">${this.escapeHtml(trip.name)}</div>
-            <div class="trip-meta">
-              <span>📍 ${stats.waypointCount} waypoints</span>
-              <span>📝 ${stats.journalCount} notes</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+    container.innerHTML = '';
+    const template = document.getElementById('tripItemTemplate');
+    trips.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).forEach(trip => {
+      const stats = Trip.getStats(trip);
+      const node = template.content.cloneNode(true);
+      const item = node.querySelector('.trip-item');
+      item.dataset.id = trip.id;
+      if (trip.id === currentTripId) item.classList.add('active');
+      node.querySelector('.trip-name').textContent = this.escapeHtml(trip.name);
+      node.querySelector('.trip-meta').innerHTML = `<span>📍 ${stats.waypointCount} waypoints</span> <span>📝 ${stats.journalCount} notes</span>`;
+      const toggle = node.querySelector('.public-toggle-checkbox');
+      toggle.checked = !!trip.is_public;
+      toggle.onchange = (e) => {
+        App.setTripPublic(trip.id, e.target.checked);
+      };
+      container.appendChild(node);
+    });
   },
 
   /**
