@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#16213e">
+  <meta name="description" content="Plan trips with waypoints, custom routes, and travel journal">
+  
+  <title>Ride - Trip Planner</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
+  
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Map Container -->
+    <div id="map"></div>
+    
+    <!-- Top Bar -->
+    <header id="topBar">
+      <button id="menuBtn" class="icon-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
+      <h1 id="tripTitle">New Trip</h1>
+      <div class="topbar-right">
+        <button id="shareBtn" class="icon-btn" aria-label="Share">
+          <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        </button>
+        <button id="userBtn" class="icon-btn user-btn" aria-label="Account">
+          <svg id="userIcon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          <img id="userAvatar" class="user-avatar hidden" alt="" />
+        </button>
+      </div>
+    </header>
+    
+    <!-- Bottom Navigation -->
+    <nav id="bottomNav">
+      <button class="nav-btn active" data-view="map">
+        <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+        <span>Map</span>
+      </button>
+      <button class="nav-btn" data-view="waypoints">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        <span>Waypoints</span>
+      </button>
+      <button class="nav-btn" data-view="journal">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span>Journal</span>
+      </button>
+      <button class="nav-btn" data-view="trips">
+        <svg viewBox="0 0 24 24"><path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6 4.83 4.5 4 4.5zm0 12c-.83 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5 1.5-.68 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/></svg>
+        <span>Trips</span>
+      </button>
+    </nav>
+    
+    <!-- Side Menu -->
+    <aside id="sideMenu" class="hidden">
+      <div class="menu-header">
+        <h2>Ride</h2>
+        <button id="closeMenu" class="icon-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <ul class="menu-list">
+        <li><button id="newTripBtn">New Trip</button></li>
+        <li><button id="importBtn">Import Trip</button></li>
+        <li><button id="exportBtn">Export Current Trip</button></li>
+        <li><button id="settingsBtn">Settings</button></li>
+        <li class="menu-divider"></li>
+        <li><button id="aboutBtn">About</button></li>
+      </ul>
+      <div class="menu-footer">
+        <p class="crafted-text">Crafted with Care by<br><strong>Robert Evans</strong><br>of <a href="https://objectiveartefacts.com.au" target="_blank" rel="noopener">Objective Artefacts Australia</a></p>
+      </div>
+    </aside>
+    <div id="menuOverlay" class="hidden"></div>
+    
+    <!-- Panels -->
+    <section id="waypointsPanel" class="panel hidden">
+      <div class="panel-header">
+        <h2>Waypoints</h2>
+        <button id="addWaypointBtn" class="primary-btn">+ Add</button>
+      </div>
+      <div id="waypointsList" class="panel-content"></div>
+    </section>
+    
+    <section id="journalPanel" class="panel hidden">
+      <div class="panel-header">
+        <h2>Trip Journal</h2>
+        <button id="addNoteBtn" class="primary-btn">+ Note</button>
+      </div>
+      <div id="journalList" class="panel-content"></div>
+    </section>
+    
+    <section id="tripsPanel" class="panel hidden">
+      <div class="panel-header">
+        <h2>My Trips</h2>
+      </div>
+      <div id="tripsList" class="panel-content"></div>
+    </section>
+    
+    <!-- Modals -->
+    <div id="waypointModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Add Waypoint</h3>
+        <form id="waypointForm">
+          <input type="text" id="waypointName" placeholder="Waypoint name" required>
+          <input type="text" id="waypointAddress" placeholder="Address or tap map">
+          <div class="coord-inputs">
+            <input type="number" id="waypointLat" placeholder="Latitude" step="any">
+            <input type="number" id="waypointLng" placeholder="Longitude" step="any">
+          </div>
+          <select id="waypointType">
+            <option value="stop">Regular Stop</option>
+            <option value="scenic">Scenic Point</option>
+            <option value="fuel">Fuel/Rest</option>
+            <option value="food">Food/Drinks</option>
+            <option value="lodging">Lodging</option>
+            <option value="custom">Custom</option>
+          </select>
+          <textarea id="waypointNotes" placeholder="Notes (optional)"></textarea>
+          <div class="modal-actions">
+            <button type="button" class="cancel-btn" data-close>Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <div id="noteModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Add Journal Entry</h3>
+        <form id="noteForm">
+          <input type="text" id="noteTitle" placeholder="Entry title" required>
+          <textarea id="noteContent" placeholder="Write your notes..." rows="6"></textarea>
+          <div class="visibility-toggle">
+            <label>
+              <input type="checkbox" id="notePrivate">
+              <span>Private note (won't be shared)</span>
+            </label>
+          </div>
+          <input type="text" id="noteTags" placeholder="Tags (comma separated)">
+          <div class="modal-actions">
+            <button type="button" class="cancel-btn" data-close>Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <div id="shareModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Share Trip</h3>
+        <div class="share-options">
+          <div class="share-link-container">
+            <input type="text" id="shareLink" readonly>
+            <button id="copyLinkBtn" class="icon-btn" aria-label="Copy link">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
+          </div>
+          <div class="share-visibility">
+            <label>Include in shared view:</label>
+            <label><input type="checkbox" id="shareWaypoints" checked> Waypoints</label>
+            <label><input type="checkbox" id="shareRoute" checked> Route</label>
+            <label><input type="checkbox" id="sharePublicNotes" checked> Public notes</label>
+          </div>
+          <div class="share-buttons">
+            <button id="shareNativeBtn" class="share-btn">Share via...</button>
+            <button id="exportJsonBtn" class="share-btn secondary" title="JSON (JavaScript Object Notation) - A universal data format that preserves all trip details including notes, waypoint types, and custom settings. Best for backing up or transferring between apps.">
+              Export JSON
+              <span class="tooltip-icon">?</span>
+            </button>
+            <button id="exportGpxBtn" class="share-btn secondary" title="GPX (GPS Exchange Format) - A standard format supported by most GPS devices and navigation apps like Google Earth, Garmin, and Strava. Contains waypoints and route coordinates.">
+              Export GPX
+              <span class="tooltip-icon">?</span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" data-close>Close</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal hidden">
+      <div class="modal-content login-modal">
+        <div class="login-header">
+          <h2>Welcome to Ride</h2>
+          <p>Sign in to save your trips and share them with others</p>
+        </div>
+        <div class="login-buttons">
+          <a href="/api/auth/login/google" class="login-btn google">
+            <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Continue with Google
+          </a>
+          <a href="/api/auth/login/facebook" class="login-btn facebook">
+            <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/></svg>
+            Continue with Facebook
+          </a>
+          <a href="/api/auth/login/microsoft" class="login-btn microsoft">
+            <svg viewBox="0 0 24 24"><path d="M11.4 11.4H0V0h11.4v11.4z" fill="#F25022"/><path d="M24 11.4H12.6V0H24v11.4z" fill="#7FBA00"/><path d="M11.4 24H0V12.6h11.4V24z" fill="#00A4EF"/><path d="M24 24H12.6V12.6H24V24z" fill="#FFB900"/></svg>
+            Continue with Microsoft
+          </a>
+        </div>
+        <p class="login-note">We only access your email and name for account creation. Your trip data stays private.</p>
+      </div>
+    </div>
+    
+    <!-- Toast notifications -->
+    <div id="toast" class="hidden"></div>
+    
+    <!-- Fullscreen toggle for supported browsers -->
+    <button id="fullscreenBtn" class="icon-btn floating-btn" aria-label="Toggle fullscreen">
+      <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+    </button>
+  </div>
+  
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/trip.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/share.js"></script>
+  <script src="js/app.js"></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('SW registered'))
+        .catch(err => console.log('SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>

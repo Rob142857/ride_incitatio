@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Dynamic meta tags will be injected by worker for social sharing -->
+  <title>Trip | Ride</title>
+  <meta name="description" content="Explore this trip on Ride - Trip planning made beautiful">
+  
+  <!-- Open Graph for Facebook, LinkedIn, etc -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Ride">
+  <meta property="og:title" content="Trip | Ride">
+  <meta property="og:description" content="Explore this trip on Ride">
+  <meta property="og:image" content="https://ride.incitat.io/icons/og-default.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@incitatio">
+  <meta name="twitter:title" content="Trip | Ride">
+  <meta name="twitter:description" content="Explore this trip on Ride">
+  <meta name="twitter:image" content="https://ride.incitat.io/icons/og-default.png">
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-tertiary: #1a1a25;
+      --bg-card: #16161f;
+      --text-primary: #f5f5f7;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.15);
+      --success: #22c55e;
+      --border: rgba(255, 255, 255, 0.08);
+      --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Hero Section */
+    .hero {
+      position: relative;
+      height: 60vh;
+      min-height: 400px;
+      max-height: 600px;
+      overflow: hidden;
+    }
+    
+    .hero-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .hero-placeholder {
+      position: absolute;
+      inset: 0;
+      background: var(--gradient-1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .hero-placeholder svg {
+      width: 120px;
+      height: 120px;
+      opacity: 0.3;
+    }
+    
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(10, 10, 15, 0.2) 0%,
+        rgba(10, 10, 15, 0.4) 50%,
+        rgba(10, 10, 15, 0.95) 100%
+      );
+    }
+    
+    .hero-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 40px 24px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .trip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+    
+    .trip-title {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .trip-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    
+    .trip-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .trip-meta-item svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.7;
+    }
+    
+    /* Main Content */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    /* Map Section */
+    .map-section {
+      margin: -60px 24px 40px;
+      position: relative;
+      z-index: 10;
+    }
+    
+    .map-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+    }
+    
+    .map-container {
+      height: 400px;
+      background: var(--bg-tertiary);
+    }
+    
+    #trip-map {
+      height: 100%;
+      width: 100%;
+    }
+    
+    .map-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1px;
+      background: var(--border);
+    }
+    
+    .stat-item {
+      background: var(--bg-card);
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Description */
+    .description-section {
+      margin-bottom: 48px;
+    }
+    
+    .description-text {
+      font-size: 18px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+    
+    /* Waypoints */
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    
+    .waypoints-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    
+    .waypoint-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+    
+    .waypoint-card:hover {
+      border-color: var(--accent);
+      transform: translateX(4px);
+    }
+    
+    .waypoint-number {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    
+    .waypoint-info {
+      flex: 1;
+    }
+    
+    .waypoint-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .waypoint-type {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    /* Journal Entries */
+    .journal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    
+    .journal-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    
+    .journal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .journal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .journal-date {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    
+    .journal-content {
+      padding: 24px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+    
+    .journal-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 24px 20px;
+    }
+    
+    .tag {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+    
+    /* Gallery */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    
+    .gallery-item {
+      aspect-ratio: 1;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+    
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    
+    .gallery-item:hover img {
+      transform: scale(1.05);
+    }
+    
+    .gallery-item-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .gallery-item:hover .gallery-item-overlay {
+      opacity: 1;
+    }
+    
+    .gallery-caption {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      color: white;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    /* Contact Card */
+    .contact-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 48px;
+      text-align: center;
+    }
+    
+    .contact-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .contact-value {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+    
+    /* Footer */
+    .page-footer {
+      padding: 48px 24px;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+    }
+    
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .footer-brand svg {
+      width: 24px;
+      height: 24px;
+    }
+    
+    .footer-brand-text {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .footer-tagline {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    
+    .footer-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    
+    .footer-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+    }
+    
+    .footer-credits {
+      margin-top: 48px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    
+    .footer-credits a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    
+    .footer-credits a:hover {
+      color: #60a5fa;
+      text-decoration: underline;
+    }
+    
+    /* Loading State */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+    }
+    
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Error State */
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 24px;
+    }
+    
+    .error-icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      opacity: 0.5;
+    }
+    
+    .error-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .error-message {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+    
+    .error-cta {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    /* Lightbox */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .lightbox.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      background: var(--bg-tertiary);
+      border: none;
+      border-radius: 50%;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .lightbox-image {
+      max-width: 90%;
+      max-height: 90%;
+      object-fit: contain;
+    }
+    
+    /* Empty States */
+    .empty-state {
+      text-align: center;
+      padding: 48px;
+      color: var(--text-muted);
+    }
+    
+    /* Responsive */
+    @media (max-width: 640px) {
+      .hero {
+        height: 50vh;
+        min-height: 300px;
+      }
+      
+      .hero-content {
+        padding: 24px 16px;
+      }
+      
+      .map-section {
+        margin: -40px 16px 32px;
+      }
+      
+      .map-container {
+        height: 300px;
+      }
+      
+      .container {
+        padding: 0 16px;
+      }
+      
+      .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Loading State -->
+  <div id="loading" class="loading">
+    <div class="loading-spinner"></div>
+    <p>Loading trip...</p>
+  </div>
+  
+  <!-- Error State (hidden by default) -->
+  <div id="error" class="error-state" style="display: none;">
+    <svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <h1 class="error-title">Trip Not Found</h1>
+    <p class="error-message">This trip may have been removed or the link is incorrect.</p>
+    <a href="/" class="error-cta">Plan Your Own Trip →</a>
+  </div>
+  
+  <!-- Main Content (hidden until loaded) -->
+  <main id="content" style="display: none;">
+    
+    <!-- Hero Section -->
+    <section class="hero">
+      <div id="hero-image-container" class="hero-placeholder">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+        </svg>
+      </div>
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <div class="trip-badge">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Trip
+        </div>
+        <h1 id="trip-title" class="trip-title">Loading...</h1>
+        <div id="trip-meta" class="trip-meta">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+    
+    <!-- Map Section -->
+    <section class="map-section container">
+      <div class="map-card">
+        <div class="map-container">
+          <div id="trip-map"></div>
+        </div>
+        <div id="map-stats" class="map-stats">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+    
+    <!-- Description -->
+    <section id="description-section" class="description-section container" style="display: none;">
+      <p id="trip-description" class="description-text"></p>
+    </section>
+    
+    <!-- Waypoints -->
+    <section id="waypoints-section" class="container" style="display: none;">
+      <h2 class="section-title">Route Stops</h2>
+      <div id="waypoints-list" class="waypoints-list">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+    
+    <!-- Gallery -->
+    <section id="gallery-section" class="container" style="display: none;">
+      <h2 class="section-title">Photos</h2>
+      <div id="gallery-grid" class="gallery-grid">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+    
+    <!-- Journal -->
+    <section id="journal-section" class="container" style="display: none;">
+      <h2 class="section-title">Journal</h2>
+      <div id="journal-list" class="journal-list">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+    
+    <!-- Contact -->
+    <section id="contact-section" class="container" style="display: none;">
+      <div class="contact-card">
+        <div class="contact-label">Contact</div>
+        <div id="contact-value" class="contact-value"></div>
+      </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="page-footer">
+      <div class="footer-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+        </svg>
+        <span class="footer-brand-text">Ride</span>
+      </div>
+      <p class="footer-tagline">Trip planning made beautiful</p>
+      <a href="/" class="footer-cta">
+        Plan Your Trip
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+        </svg>
+      </a>
+      <p class="footer-credits">Crafted with care by Robert Evans of <a href="https://objectiveartefacts.com.au" target="_blank" rel="noopener">Objective Artefacts Australia</a></p>
+    </footer>
+    
+  </main>
+  
+  <!-- Lightbox for images -->
+  <div id="lightbox" class="lightbox">
+    <button class="lightbox-close" onclick="closeLightbox()">
+      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <img id="lightbox-image" class="lightbox-image" src="" alt="">
+  </div>
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <script>
+    // Get short code from URL - supports both /abc123 and /trip/abc123
+    const pathParts = window.location.pathname.split('/').filter(p => p);
+    const shortCode = pathParts[pathParts.length - 1];
+    
+    let map = null;
+    
+    async function loadTrip() {
+      try {
+        const response = await fetch(`/api/s/${shortCode}`);
+        
+        if (!response.ok) {
+          showError();
+          return;
+        }
+        
+        const data = await response.json();
+        renderTrip(data.trip);
+        
+      } catch (error) {
+        console.error('Failed to load trip:', error);
+        showError();
+      }
+    }
+    
+    function showError() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'flex';
+    }
+    
+    function renderTrip(trip) {
+      // Update page title and meta
+      document.title = `${trip.title} | Ride`;
+      
+      // Update meta tags for social sharing
+      updateMeta('og:title', trip.title);
+      updateMeta('og:description', trip.description || 'Explore this trip on Ride');
+      updateMeta('og:url', window.location.href);
+      updateMeta('twitter:title', trip.title);
+      updateMeta('twitter:description', trip.description || 'Explore this trip on Ride');
+      
+      if (trip.cover_image) {
+        updateMeta('og:image', trip.cover_image);
+        updateMeta('twitter:image', trip.cover_image);
+      }
+      
+      // Hero image
+      if (trip.cover_image) {
+        const heroContainer = document.getElementById('hero-image-container');
+        heroContainer.className = '';
+        heroContainer.innerHTML = `<img class="hero-image" src="${trip.cover_image}" alt="${trip.title}">`;
+      }
+      
+      // Title
+      document.getElementById('trip-title').textContent = trip.title;
+      
+      // Meta info
+      const metaHtml = [];
+      if (trip.waypoints?.length) {
+        metaHtml.push(`
+          <span class="trip-meta-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            </svg>
+            ${trip.waypoints.length} stops
+          </span>
+        `);
+      }
+      if (trip.route?.distance) {
+        metaHtml.push(`
+          <span class="trip-meta-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            ${formatDistance(trip.route.distance)}
+          </span>
+        `);
+      }
+      if (trip.created_at) {
+        metaHtml.push(`
+          <span class="trip-meta-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            ${formatDate(trip.created_at)}
+          </span>
+        `);
+      }
+      document.getElementById('trip-meta').innerHTML = metaHtml.join('');
+      
+      // Map stats
+      const statsHtml = [];
+      if (trip.waypoints?.length) {
+        statsHtml.push(`<div class="stat-item"><div class="stat-value">${trip.waypoints.length}</div><div class="stat-label">Stops</div></div>`);
+      }
+      if (trip.route?.distance) {
+        statsHtml.push(`<div class="stat-item"><div class="stat-value">${formatDistance(trip.route.distance)}</div><div class="stat-label">Distance</div></div>`);
+      }
+      if (trip.route?.duration) {
+        statsHtml.push(`<div class="stat-item"><div class="stat-value">${formatDuration(trip.route.duration)}</div><div class="stat-label">Duration</div></div>`);
+      }
+      if (trip.journal?.length) {
+        statsHtml.push(`<div class="stat-item"><div class="stat-value">${trip.journal.length}</div><div class="stat-label">Journal Entries</div></div>`);
+      }
+      document.getElementById('map-stats').innerHTML = statsHtml.join('');
+      
+      // Initialize map
+      initMap(trip);
+      
+      // Description
+      if (trip.description) {
+        document.getElementById('trip-description').textContent = trip.description;
+        document.getElementById('description-section').style.display = 'block';
+      }
+      
+      // Waypoints
+      if (trip.waypoints?.length) {
+        const waypointsHtml = trip.waypoints.map((wp, i) => `
+          <div class="waypoint-card" data-lat="${wp.lat}" data-lng="${wp.lng}">
+            <div class="waypoint-number">${i + 1}</div>
+            <div class="waypoint-info">
+              <div class="waypoint-name">${escapeHtml(wp.name)}</div>
+              <div class="waypoint-type">${wp.type || 'Stop'}</div>
+            </div>
+          </div>
+        `).join('');
+        document.getElementById('waypoints-list').innerHTML = waypointsHtml;
+        document.getElementById('waypoints-section').style.display = 'block';
+        
+        // Click to zoom on waypoint
+        document.querySelectorAll('.waypoint-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const lat = parseFloat(card.dataset.lat);
+            const lng = parseFloat(card.dataset.lng);
+            if (map) map.setView([lat, lng], 14);
+          });
+        });
+      }
+      
+      // Gallery
+      const images = trip.attachments?.filter(a => a.type?.startsWith('image/'));
+      if (images?.length) {
+        const galleryHtml = images.map(img => `
+          <div class="gallery-item" onclick="openLightbox('${img.url}')">
+            <img src="${img.url}" alt="${escapeHtml(img.caption || img.name)}" loading="lazy">
+            <div class="gallery-item-overlay"></div>
+            ${img.caption ? `<div class="gallery-caption">${escapeHtml(img.caption)}</div>` : ''}
+          </div>
+        `).join('');
+        document.getElementById('gallery-grid').innerHTML = galleryHtml;
+        document.getElementById('gallery-section').style.display = 'block';
+      }
+      
+      // Journal entries
+      if (trip.journal?.length) {
+        const journalHtml = trip.journal.map(entry => `
+          <article class="journal-card">
+            <div class="journal-header">
+              <h3 class="journal-title">${escapeHtml(entry.title)}</h3>
+              <div class="journal-date">${formatDate(entry.created_at)}</div>
+            </div>
+            ${entry.content ? `<div class="journal-content">${escapeHtml(entry.content)}</div>` : ''}
+            ${entry.tags?.length ? `
+              <div class="journal-tags">
+                ${entry.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
+              </div>
+            ` : ''}
+          </article>
+        `).join('');
+        document.getElementById('journal-list').innerHTML = journalHtml;
+        document.getElementById('journal-section').style.display = 'block';
+      }
+      
+      // Contact
+      if (trip.contact) {
+        document.getElementById('contact-value').textContent = trip.contact;
+        document.getElementById('contact-section').style.display = 'block';
+      }
+      
+      // Show content
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+    }
+    
+    function initMap(trip) {
+      map = L.map('trip-map', {
+        zoomControl: true,
+        scrollWheelZoom: true
+      });
+      
+      // Dark tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 19
+      }).addTo(map);
+      
+      const markers = [];
+      const bounds = [];
+      
+      // Add waypoint markers
+      if (trip.waypoints?.length) {
+        trip.waypoints.forEach((wp, i) => {
+          const marker = L.circleMarker([wp.lat, wp.lng], {
+            radius: 10,
+            fillColor: '#3b82f6',
+            color: '#fff',
+            weight: 2,
+            fillOpacity: 0.9
+          }).addTo(map);
+          
+          marker.bindPopup(`<b>${i + 1}. ${escapeHtml(wp.name)}</b>`);
+          markers.push(marker);
+          bounds.push([wp.lat, wp.lng]);
+        });
+      }
+      
+      // Draw route if available
+      if (trip.route?.coordinates?.length) {
+        const routeLine = L.polyline(trip.route.coordinates.map(c => [c.lat, c.lng]), {
+          color: '#3b82f6',
+          weight: 4,
+          opacity: 0.8
+        }).addTo(map);
+        
+        trip.route.coordinates.forEach(c => bounds.push([c.lat, c.lng]));
+      }
+      
+      // Fit bounds
+      if (bounds.length) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      } else {
+        // Default to Australia
+        map.setView([-25.2744, 133.7751], 4);
+      }
+    }
+    
+    function updateMeta(property, content) {
+      let meta = document.querySelector(`meta[property="${property}"]`) || 
+                 document.querySelector(`meta[name="${property}"]`);
+      if (meta) meta.setAttribute('content', content);
+    }
+    
+    function formatDistance(meters) {
+      if (meters >= 1000) {
+        return (meters / 1000).toFixed(1) + ' km';
+      }
+      return Math.round(meters) + ' m';
+    }
+    
+    function formatDuration(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes} min`;
+    }
+    
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-AU', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Lightbox
+    function openLightbox(src) {
+      document.getElementById('lightbox-image').src = src;
+      document.getElementById('lightbox').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+    
+    document.getElementById('lightbox').addEventListener('click', (e) => {
+      if (e.target.id === 'lightbox') closeLightbox();
+    });
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+    
+    // Load trip on page load
+    loadTrip();
+  </script>
+  
+</body>
+</html>

@@ -1,0 +1,56 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Decorative circles -->
+  <circle cx="100" cy="100" r="200" fill="rgba(255,255,255,0.05)"/>
+  <circle cx="1100" cy="530" r="250" fill="rgba(255,255,255,0.05)"/>
+  
+  <!-- Map icon -->
+  <g transform="translate(480, 150)">
+    <path d="M60 20L23.8 3.8A6.7 6.7 0 0020 3.8 6.7 6.7 0 0010 10v72a6.7 6.7 0 003.3 5.8L60 100m0-80l46.7 23.3A6.7 6.7 0 00120 39V-33a6.7 6.7 0 00-3.3-5.8L60 20m0 80V20m60 66.7l30.5 15.3a6.7 6.7 0 009.5-6V23.3a6.7 6.7 0 00-3.3-5.8L120 0m0 86.7V0" 
+          stroke="rgba(255,255,255,0.9)" 
+          stroke-width="6" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"
+          transform="scale(1.8)"/>
+  </g>
+  
+  <!-- Brand name -->
+  <text x="600" y="420" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="96" 
+        font-weight="700" 
+        fill="white" 
+        text-anchor="middle">
+    Ride
+  </text>
+  
+  <!-- Tagline -->
+  <text x="600" y="490" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="32" 
+        font-weight="400" 
+        fill="rgba(255,255,255,0.8)" 
+        text-anchor="middle">
+    Trip planning made beautiful
+  </text>
+  
+  <!-- Domain -->
+  <text x="600" y="580" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="24" 
+        font-weight="500" 
+        fill="rgba(255,255,255,0.6)" 
+        text-anchor="middle">
+    ride.incitat.io
+  </text>
+</svg>

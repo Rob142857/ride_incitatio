@@ -1,0 +1,207 @@
+/**
+ * Utility functions for the API
+ */
+
+/**
+ * CORS headers
+ */
+export function cors(response = new Response(null, { status: 204 })) {
+  const headers = new Headers(response.headers);
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  headers.set('Access-Control-Max-Age', '86400');
+  
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+/**
+ * JSON response helper
+ */
+export function jsonResponse(data, status = 200) {
+  return cors(new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  }));
+}
+
+/**
+ * Error response helper
+ */
+export function errorResponse(message, status = 400) {
+  return jsonResponse({ error: message }, status);
+}
+
+/**
+ * Generate unique ID
+ */
+export function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+/**
+ * Generate short URL code (6 characters, base62)
+ * Uses characters: 0-9, a-z, A-Z for 62^6 = 56+ billion combinations
+ */
+export function generateShortCode() {
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let code = '';
+  const array = new Uint8Array(6);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < 6; i++) {
+    code += chars[array[i] % 62];
+  }
+  return code;
+}
+
+/**
+ * Base URL for the application
+ */
+export const BASE_URL = 'https://ride.incitat.io';
+
+/**
+ * Parse JSON body safely
+ */
+export async function parseBody(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Authentication middleware
+ */
+export async function requireAuth(context) {
+  const { request, env } = context;
+  
+  // Get token from Authorization header or cookie
+  let token = null;
+  
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else {
+    // Check cookie
+    const cookies = request.headers.get('Cookie') || '';
+    const match = cookies.match(/ride_session=([^;]+)/);
+    if (match) {
+      token = match[1];
+    }
+  }
+  
+  if (!token) {
+    return errorResponse('Unauthorized', 401);
+  }
+  
+  // Verify token from KV store
+  try {
+    const sessionData = await env.SESSIONS.get(token, 'json');
+    if (!sessionData) {
+      return errorResponse('Session expired', 401);
+    }
+    
+    // Check expiry
+    if (sessionData.expiresAt && Date.now() > sessionData.expiresAt) {
+      await env.SESSIONS.delete(token);
+      return errorResponse('Session expired', 401);
+    }
+    
+    // Attach user to context
+    context.user = sessionData.user;
+    
+    // Continue to next handler (return nothing)
+    return;
+  } catch (error) {
+    console.error('Auth error:', error);
+    return errorResponse('Authentication failed', 401);
+  }
+}
+
+/**
+ * Optional authentication middleware - doesn't fail if not logged in
+ */
+export async function optionalAuth(context) {
+  const { request, env } = context;
+  
+  // Get token from Authorization header or cookie
+  let token = null;
+  
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else {
+    const cookies = request.headers.get('Cookie') || '';
+    const match = cookies.match(/ride_session=([^;]+)/);
+    if (match) {
+      token = match[1];
+    }
+  }
+  
+  if (!token) {
+    context.user = null;
+    return; // Continue without auth
+  }
+  
+  try {
+    const sessionData = await env.SESSIONS.get(token, 'json');
+    if (sessionData && (!sessionData.expiresAt || Date.now() <= sessionData.expiresAt)) {
+      context.user = sessionData.user;
+    } else {
+      context.user = null;
+    }
+  } catch {
+    context.user = null;
+  }
+  
+  return; // Always continue
+}
+
+/**
+ * Create session token and store in KV
+ */
+export async function createSession(env, user) {
+  const token = generateId() + generateId(); // Longer token
+  const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
+  
+  await env.SESSIONS.put(token, JSON.stringify({
+    user,
+    expiresAt
+  }), {
+    expirationTtl: 30 * 24 * 60 * 60 // 30 days in seconds
+  });
+  
+  return { token, expiresAt };
+}
+
+/**
+ * Set session cookie
+ */
+export function setSessionCookie(response, token, expiresAt) {
+  const headers = new Headers(response.headers);
+  const expires = new Date(expiresAt).toUTCString();
+  headers.append('Set-Cookie', `ride_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${expires}`);
+  
+  return new Response(response.body, {
+    status: response.status,
+    headers
+  });
+}
+
+/**
+ * Clear session cookie
+ */
+export function clearSessionCookie(response) {
+  const headers = new Headers(response.headers);
+  headers.append('Set-Cookie', 'ride_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
+  
+  return new Response(response.body, {
+    status: response.status,
+    headers
+  });
+}

@@ -1,0 +1,36 @@
+name = "ride-trip-planner"
+main = "api/worker.js"
+compatibility_date = "2024-01-01"
+
+# Cloudflare Pages configuration
+pages_build_output_dir = "./"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "ride-db"
+database_id = "" # Will be filled after running: wrangler d1 create ride-db
+
+# KV for session storage
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "" # Will be filled after running: wrangler kv:namespace create SESSIONS
+
+# R2 bucket for file attachments (images, documents)
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "ride-attachments"
+# Create with: wrangler r2 bucket create ride-attachments
+
+# Environment variables (set via Cloudflare dashboard or wrangler secret)
+# GOOGLE_CLIENT_ID = ""
+# GOOGLE_CLIENT_SECRET = ""
+# FACEBOOK_APP_ID = ""
+# FACEBOOK_APP_SECRET = ""
+# MICROSOFT_CLIENT_ID = ""
+# MICROSOFT_CLIENT_SECRET = ""
+# JWT_SECRET = ""
+
+[vars]
+ENVIRONMENT = "production"
+BASE_URL = "https://ride.incitat.io"

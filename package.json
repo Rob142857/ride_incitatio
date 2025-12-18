@@ -1,0 +1,23 @@
+{
+  "name": "ride-trip-planner",
+  "version": "1.0.0",
+  "description": "Stripped-down trip planning PWA with waypoints, routes, and journal",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve -p 3000",
+    "start": "npx serve -p 3000",
+    "deploy": "wrangler pages deploy . --project-name=ride",
+    "db:create": "wrangler d1 create ride-db",
+    "db:migrate": "wrangler d1 execute ride-db --file=./api/schema.sql",
+    "db:migrate:local": "wrangler d1 execute ride-db --file=./api/schema.sql --local",
+    "kv:create": "wrangler kv:namespace create SESSIONS",
+    "dev:remote": "wrangler pages dev . --d1=ride-db --kv=SESSIONS",
+    "setup": "echo 'Run: npm run db:create && npm run kv:create && update wrangler.toml with IDs && npm run db:migrate'"
+  },
+  "keywords": ["pwa", "trip", "navigation", "waypoints", "journal", "cloudflare"],
+  "author": "Robert Evans - Objective Artefacts Australia",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
