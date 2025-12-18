@@ -7,6 +7,7 @@ const App = {
   isOnline: true,
   useCloud: false, // Will be true when deployed to Cloudflare
   isSharedView: false,
+  isRiding: false,
   loginPromptShown: false,
   tripDetailId: null,
 
@@ -147,12 +148,117 @@ const App = {
 
   },
 
+  formatDistance(meters) {
+    if (!meters && meters !== 0) return '—';
+    if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';
+    return Math.round(meters) + ' m';
+  },
+
+  formatDuration(seconds) {
+    if (!seconds && seconds !== 0) return '—';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes} min`;
+  },
+
+  /**
+   * Placeholder: tile prefetch could be added here (e.g., fetch surrounding tiles by bounding box)
+   */
+  prefetchTiles() {
+    // TODO: implement lightweight tile warmup around route
+  },
+
   /**
    * Enter riding mode (stub for upcoming riding view)
    */
   enterRideMode() {
-    UI.showToast('Riding view is coming soon', 'info');
-    // Placeholder: will route to riding screen when implemented
+    if (!this.currentTrip) {
+      UI.showToast('No trip loaded', 'error');
+      return;
+    }
+    if (!this.currentTrip.route || !this.currentTrip.route.coordinates) {
+      UI.showToast('Add a route first to start riding', 'error');
+      return;
+    }
+
+    this.isRiding = true;
+    document.getElementById('rideOverlay')?.classList.remove('hidden');
+    document.body.classList.add('ride-mode');
+
+    // Populate overlay
+    document.getElementById('rideTripName').textContent = this.currentTrip.name || 'Ride';
+    document.getElementById('rideStops').textContent = (this.currentTrip.waypoints?.length ?? 0).toString();
+    document.getElementById('rideDistanceRemaining').textContent = this.currentTrip.route?.distance ? this.formatDistance(this.currentTrip.route.distance) : '—';
+    document.getElementById('rideEta').textContent = this.currentTrip.route?.duration ? this.formatDuration(this.currentTrip.route.duration) : '—';
+    document.getElementById('rideNextInstruction').textContent = 'Follow the route';
+    document.getElementById('rideNextMeta').textContent = 'Waiting for GPS...';
+    this.precomputeRouteMetrics();
+
+    MapManager.startRide((pos) => this.onRidePosition(pos));
+  },
+
+  exitRideMode() {
+    this.isRiding = false;
+    document.getElementById('rideOverlay')?.classList.add('hidden');
+    document.body.classList.remove('ride-mode');
+    MapManager.stopRide();
+  },
+
+  precomputeRouteMetrics() {
+    if (!this.currentTrip?.route?.coordinates) return;
+    const coords = this.currentTrip.route.coordinates;
+    const cumulative = [0];
+    let total = 0;
+    for (let i = 1; i < coords.length; i++) {
+      total += this.haversine(coords[i - 1], coords[i]);
+      cumulative.push(total);
+    }
+    this.currentTrip.route._cumulative = cumulative;
+    this.currentTrip.route._total = total;
+  },
+
+  haversine(a, b) {
+    const toRad = (v) => v * Math.PI / 180;
+    const R = 6371000;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  },
+
+  onRidePosition(pos) {
+    if (!this.isRiding || !this.currentTrip?.route?.coordinates || !this.currentTrip.route._cumulative) return;
+    const coords = this.currentTrip.route.coordinates;
+    const cumulative = this.currentTrip.route._cumulative;
+    const total = this.currentTrip.route._total || cumulative[cumulative.length - 1] || 0;
+
+    // Find nearest segment point
+    let nearestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < coords.length; i++) {
+      const d = this.haversine(coords[i], pos);
+      if (d < bestDist) {
+        bestDist = d;
+        nearestIdx = i;
+      }
+    }
+
+    const remaining = Math.max(0, total - cumulative[nearestIdx]);
+    document.getElementById('rideDistanceRemaining').textContent = this.formatDistance(remaining);
+
+    // Next instruction: first step whose index >= nearestIdx
+    const steps = this.currentTrip.route.steps || [];
+    const nextStep = steps.find((s) => s.index >= nearestIdx) || steps[steps.length - 1];
+    if (nextStep) {
+      document.getElementById('rideNextInstruction').textContent = nextStep.text || 'Continue';
+      document.getElementById('rideNextMeta').textContent = `${this.formatDistance(nextStep.distance || 0)} ahead`;
+    } else {
+      document.getElementById('rideNextInstruction').textContent = 'Finish';
+      document.getElementById('rideNextMeta').textContent = 'Approaching destination';
+    }
   },
 
   /**

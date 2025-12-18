@@ -7,6 +7,11 @@ const MapManager = {
   waypointMarkers: {},
   isAddingWaypoint: false,
   pendingLocation: null,
+  rideWatchId: null,
+  rideMarker: null,
+  rideHeading: null,
+  rideAccuracyCircle: null,
+  ridePositionCb: null,
 
   // Waypoint type icons
   waypointIcons: {
@@ -16,6 +21,202 @@ const MapManager = {
     food: { color: '#f97316', icon: '🍽️' },
     lodging: { color: '#8b5cf6', icon: '🏨' },
     custom: { color: '#06b6d4', icon: '⭐' }
+  },
+
+  /**
+   * Start riding mode: show live position and follow
+   */
+  startRide(onPosition) {
+    if (!('geolocation' in navigator)) {
+      UI.showToast('GPS not available on this device', 'error');
+      return;
+    }
+
+    // Ensure map is ready
+    if (!this.map) return;
+
+    // Create rider marker
+    if (!this.rideMarker) {
+      this.rideMarker = L.marker([0, 0], {
+        icon: this.createRideIcon(0),
+        interactive: false
+      }).addTo(this.map);
+    }
+
+    this.ridePositionCb = onPosition;
+
+    // Watch position
+    this.rideWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, heading, accuracy } = pos.coords;
+        const latlng = [latitude, longitude];
+        this.rideHeading = heading;
+        this.rideMarker.setLatLng(latlng);
+        this.rideMarker.setIcon(this.createRideIcon(heading || 0));
+
+        // Auto-pan without spinning the map
+        const currentCenter = this.map.getCenter();
+        const distToCenter = this.haversineLatLng(currentCenter, latlng);
+        if (distToCenter > 30) {
+          this.map.panTo(latlng, { animate: true });
+        }
+
+        if (!this.rideAccuracyCircle) {
+          this.rideAccuracyCircle = L.circle(latlng, { radius: accuracy || 20, color: '#60a5fa', weight: 1, fillOpacity: 0.08 }).addTo(this.map);
+        } else {
+          this.rideAccuracyCircle.setLatLng(latlng);
+          this.rideAccuracyCircle.setRadius(accuracy || 20);
+        }
+
+        if (typeof this.ridePositionCb === 'function') {
+          this.ridePositionCb({ lat: latitude, lng: longitude, heading, accuracy });
+        }
+      },
+      (err) => {
+        console.error('Ride GPS error', err);
+        UI.showToast('GPS signal lost', 'error');
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 15000
+      }
+    );
+  },
+
+  /**
+   * Stop riding mode tracking
+   */
+  stopRide() {
+    if (this.rideWatchId && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.rideWatchId);
+    }
+    this.rideWatchId = null;
+    this.ridePositionCb = null;
+    if (this.rideMarker) {
+      this.map.removeLayer(this.rideMarker);
+      this.rideMarker = null;
+    }
+    if (this.rideAccuracyCircle) {
+      this.map.removeLayer(this.rideAccuracyCircle);
+      this.rideAccuracyCircle = null;
+    }
+  },
+
+  createRideIcon(heading) {
+    const rotation = `transform: rotate(${heading || 0}deg);`;
+    return L.divIcon({
+      className: 'ride-marker',
+      html: `<div class="ride-marker-inner" style="${rotation}"><div class="ride-arrow"></div></div>`
+    });
+  },
+
+  haversineLatLng(a, b) {
+    const toRad = (v) => v * Math.PI / 180;
+    const R = 6371000;
+    const latA = (a && (a.lat ?? a[0])) ?? 0;
+    const lngA = (a && (a.lng ?? a[1])) ?? 0;
+    const latB = (b && (b.lat ?? b[0])) ?? 0;
+    const lngB = (b && (b.lng ?? b[1])) ?? 0;
+    const dLat = toRad(latB - latA);
+    const dLng = toRad(lngB - lngA);
+    const lat1 = toRad(latA);
+    const lat2 = toRad(latB);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  },
+
+  rerouteFromPosition(startPos, remainingWaypoints = []) {
+    const startLatLng = L.latLng(startPos.lat, startPos.lng);
+    const ordered = [startLatLng, ...remainingWaypoints.map(wp => L.latLng(wp.lat, wp.lng))];
+
+    // Clear existing route/control and rebuild
+    this.clearRoute();
+
+    if (ordered.length < 2) return;
+
+    this.routingControl = L.Routing.control({
+      waypoints: ordered,
+      routeWhileDragging: false,
+      showAlternatives: false,
+      addWaypoints: false,
+      fitSelectedRoutes: false,
+      lineOptions: {
+        styles: [
+          { color: '#e94560', opacity: 0.8, weight: 6 },
+          { color: '#ff6b6b', opacity: 0.5, weight: 10 }
+        ]
+      },
+      createMarker: () => null,
+      show: false
+    }).addTo(this.map);
+
+    this.routingControl.on('routesfound', (e) => {
+      const route = e.routes[0];
+      if (route) {
+        const steps = (route.instructions || []).map((instr) => ({
+          text: instr.text,
+          distance: instr.distance,
+          time: instr.time,
+          index: instr.index
+        }));
+
+        App.saveRouteData({
+          distance: route.summary.totalDistance,
+          time: route.summary.totalTime,
+          coordinates: route.coordinates,
+          steps
+        });
+
+        UI.showToast('Rerouted', 'info');
+      }
+    });
+  },
+
+  prefetchTiles(coords) {
+    if (!coords || !coords.length) return;
+    const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const zoom = 13;
+    const subs = ['a', 'b', 'c'];
+
+    const toTile = (lat, lng, z) => {
+      const x = Math.floor((lng + 180) / 360 * Math.pow(2, z));
+      const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * Math.pow(2, z));
+      return { x, y };
+    };
+
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    coords.forEach(c => {
+      minLat = Math.min(minLat, c.lat);
+      maxLat = Math.max(maxLat, c.lat);
+      minLng = Math.min(minLng, c.lng);
+      maxLng = Math.max(maxLng, c.lng);
+    });
+
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    const centerTile = toTile(centerLat, centerLng, zoom);
+
+    const fetchTile = (x, y) => {
+      const sub = subs[Math.abs(x + y) % subs.length];
+      const url = tileUrl.replace('{s}', sub).replace('{z}', zoom).replace('{x}', x).replace('{y}', y);
+      fetch(url, { mode: 'no-cors' }).catch(() => {});
+    };
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        fetchTile(centerTile.x + dx, centerTile.y + dy);
+      }
+    }
+  },
+
+  /**
+   * Recenter on rider
+   */
+  recenterRide() {
+    if (this.rideMarker) {
+      this.map.setView(this.rideMarker.getLatLng(), Math.max(this.map.getZoom(), 15));
+    }
   },
 
   /**
@@ -248,10 +449,18 @@ const MapManager = {
     this.routingControl.on('routesfound', (e) => {
       const route = e.routes[0];
       if (route) {
+        const steps = (route.instructions || []).map((instr) => ({
+          text: instr.text,
+          distance: instr.distance,
+          time: instr.time,
+          index: instr.index
+        }));
+
         App.saveRouteData({
           distance: route.summary.totalDistance,
           time: route.summary.totalTime,
-          coordinates: route.coordinates
+          coordinates: route.coordinates,
+          steps
         });
       }
     });

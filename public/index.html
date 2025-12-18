@@ -122,6 +122,43 @@
         </div>
       </div>
     </div>
+
+    <!-- Ride Overlay -->
+    <section id="rideOverlay" class="ride-overlay hidden">
+      <div class="ride-top">
+        <div class="ride-title-group">
+          <div class="ride-pill">Riding</div>
+          <div class="ride-trip-name" id="rideTripName">Ride</div>
+        </div>
+        <div class="ride-actions">
+          <button id="rideRecenterBtn" class="ride-icon-btn" aria-label="Recenter">
+            <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 3h-1.07a6.002 6.002 0 00-5.93-5.93V4h-2v1.07A6.002 6.002 0 004.07 11H3v2h1.07a6.002 6.002 0 005.93 5.93V20h2v-1.07a6.002 6.002 0 005.93-5.93H20v-2z"/></svg>
+          </button>
+          <button id="rideExitBtn" class="ride-icon-btn" aria-label="Exit ride">
+            <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="none"/><path d="M10 8l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 12H6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="ride-banner">
+        <div class="ride-next-label">Next</div>
+        <div class="ride-next-main" id="rideNextInstruction">Ready to ride</div>
+        <div class="ride-next-meta" id="rideNextMeta">Waiting for GPS...</div>
+      </div>
+      <div class="ride-stats">
+        <div class="ride-stat">
+          <div class="ride-stat-label">Remaining</div>
+          <div class="ride-stat-value" id="rideDistanceRemaining">—</div>
+        </div>
+        <div class="ride-stat">
+          <div class="ride-stat-label">Stops</div>
+          <div class="ride-stat-value" id="rideStops">—</div>
+        </div>
+        <div class="ride-stat">
+          <div class="ride-stat-label">ETA</div>
+          <div class="ride-stat-value" id="rideEta">—</div>
+        </div>
+      </div>
+    </section>
     
     <!-- Panels -->
     <section id="waypointsPanel" class="panel hidden">
