@@ -3,10 +3,12 @@
  */
 export function cors(response = new Response(null, { status: 204 })) {
   const headers = new Headers(response.headers);
-  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Origin', BASE_URL);
+  headers.set('Access-Control-Allow-Credentials', 'true');
   headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   headers.set('Access-Control-Max-Age', '86400');
+  headers.append('Vary', 'Origin');
   
   return new Response(response.body, {
     status: response.status,

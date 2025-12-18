@@ -47,6 +47,7 @@ const App = {
     // Bind user button
     this.bindUserButton();
     this.bindTripDetails();
+    this.bindSessionRefresh();
     
     if (authError) {
       UI.showToast('Login failed. Please try again.', 'error');
@@ -78,11 +79,17 @@ const App = {
         this.useCloud = true;
         this.updateUserUI();
         UI.closeModal('loginModal');
+        return true;
       }
-    } catch (error) {
-      // Not authenticated or API not available - use local storage
-      console.log('Using local storage mode');
+      // No session present (401)
+      this.currentUser = null;
       this.useCloud = false;
+      return false;
+    } catch (error) {
+      console.error('Auth check failed', error);
+      UI.showToast('Auth check failed. Working offline until re-auth.', 'info');
+      // Preserve existing useCloud flag so we can retry when online/focused
+      return false;
     }
   },
 
@@ -150,6 +157,25 @@ const App = {
       });
     }
 
+  },
+
+  bindSessionRefresh() {
+    // Re-verify session and refresh trips when returning to the app or regaining connectivity
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden) return;
+      const hadUser = !!this.currentUser;
+      const authed = await this.checkAuth();
+      if (authed || hadUser) {
+        this.refreshTripsList();
+      }
+    });
+
+    window.addEventListener('online', async () => {
+      const authed = await this.checkAuth();
+      if (authed) {
+        this.refreshTripsList();
+      }
+    });
   },
 
   formatDistance(meters) {

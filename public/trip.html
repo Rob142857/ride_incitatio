@@ -275,6 +275,19 @@
       gap: 1px;
       background: var(--border);
     }
+
+    .download-actions {
+      margin: 12px 0 0;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+
+    .download-actions .map-btn {
+      border-color: rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+    }
     
     .stat-item {
       background: var(--bg-card);
@@ -782,6 +795,10 @@
           <!-- Dynamically populated -->
         </div>
       </div>
+      <div class="download-actions">
+        <button class="map-btn" id="downloadJsonBtnAlt">Download JSON</button>
+        <button class="map-btn" id="downloadGpxBtnAlt">Download GPX</button>
+      </div>
     </section>
     
     <!-- Description -->
@@ -1226,6 +1243,12 @@
       if (window.trip) downloadJson(window.trip);
     });
     document.getElementById('downloadGpxBtn')?.addEventListener('click', () => {
+      if (window.trip) downloadGpx(window.trip);
+    });
+    document.getElementById('downloadJsonBtnAlt')?.addEventListener('click', () => {
+      if (window.trip) downloadJson(window.trip);
+    });
+    document.getElementById('downloadGpxBtnAlt')?.addEventListener('click', () => {
       if (window.trip) downloadGpx(window.trip);
     });
 

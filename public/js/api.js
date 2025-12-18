@@ -26,11 +26,13 @@ const API = {
     try {
       const response = await fetch(url, config);
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed');
+        const err = new Error(data.error || 'Request failed');
+        err.status = response.status;
+        throw err;
       }
-      
+
       return data;
     } catch (error) {
       console.error('API Error:', error);
@@ -44,8 +46,9 @@ const API = {
       try {
         const data = await API.request('/auth/me');
         return data.user;
-      } catch {
-        return null;
+      } catch (err) {
+        if (err.status === 401) return null;
+        throw err;
       }
     },
     
