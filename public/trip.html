@@ -893,17 +893,18 @@
       updateMeta('og:url', window.location.href);
       updateMeta('twitter:title', trip.title);
       updateMeta('twitter:description', trip.description || 'Explore this trip on Ride');
-      
-      if (trip.cover_image) {
-        updateMeta('og:image', trip.cover_image);
-        updateMeta('twitter:image', trip.cover_image);
+
+      const heroImage = trip.cover_image || trip.cover_image_url;
+      if (heroImage) {
+        updateMeta('og:image', heroImage);
+        updateMeta('twitter:image', heroImage);
       }
       
       // Hero image
-      if (trip.cover_image) {
+      if (heroImage) {
         const heroContainer = document.getElementById('hero-image-container');
         heroContainer.className = '';
-        heroContainer.innerHTML = `<img class="hero-image" src="${trip.cover_image}" alt="${trip.title}">`;
+        heroContainer.innerHTML = `<img class="hero-image" src="${heroImage}" alt="${trip.title}">`;
       }
       
       // Title

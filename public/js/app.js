@@ -616,6 +616,8 @@ const App = {
   fillTripDetailsForm(trip) {
     document.getElementById('tripDetailName').value = trip.name || '';
     document.getElementById('tripDetailDescription').value = trip.description || '';
+    const coverInput = document.getElementById('tripDetailCover');
+    if (coverInput) coverInput.value = trip.cover_image_url || '';
     document.getElementById('tripDetailPublic').checked = !!trip.is_public;
     const linkInput = document.getElementById('tripDetailLink');
     const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
@@ -626,6 +628,7 @@ const App = {
   async saveTripDetails() {
     const name = document.getElementById('tripDetailName').value.trim();
     const description = document.getElementById('tripDetailDescription').value.trim();
+    const coverImageUrl = document.getElementById('tripDetailCover').value.trim();
     const isPublic = document.getElementById('tripDetailPublic').checked;
     const tripId = this.tripDetailId;
 
@@ -642,7 +645,7 @@ const App = {
     try {
       let updatedTrip;
       if (this.useCloud && this.currentUser) {
-        await API.trips.update(tripId, { name, description, is_public: isPublic });
+        await API.trips.update(tripId, { name, description, is_public: isPublic, cover_image_url: coverImageUrl || null });
 
         // Ensure short link exists when public (fixed code per trip)
         if (isPublic) {
@@ -662,6 +665,7 @@ const App = {
         trip.name = name;
         trip.description = description;
         trip.is_public = isPublic;
+        trip.cover_image_url = coverImageUrl;
         Storage.saveTrip(trip);
         updatedTrip = trip;
       }
@@ -798,7 +802,8 @@ const App = {
           name: this.currentTrip.name,
           description: this.currentTrip.description,
           settings: this.currentTrip.settings,
-          route: this.currentTrip.route
+          route: this.currentTrip.route,
+          cover_image_url: this.currentTrip.cover_image_url
         });
       } catch (error) {
         console.error('Failed to save to cloud:', error);

@@ -16,6 +16,7 @@ const Trip = {
       route: null,
       customRoutePoints: [],
       journal: [],
+      cover_image_url: '',
       is_public: false,
       short_code: null,
       settings: {
@@ -226,6 +227,7 @@ const Trip = {
       id: trip.shareSettings.shareId || trip.id,
       name: trip.name,
       description: trip.description,
+      cover_image: trip.cover_image_url || null,
       waypoints: includeWaypoints ? trip.waypoints : [],
       route: includeRoute ? trip.route : null,
       customRoutePoints: includeRoute ? trip.customRoutePoints : [],

@@ -575,6 +575,7 @@ export const TripsHandler = {
     
     // Find cover image
     const coverImage = attachments.results.find(a => a.is_cover) || attachments.results.find(a => a.mime_type?.startsWith('image/'));
+    const coverUrl = trip.cover_image_url || (coverImage ? `${BASE_URL}/api/attachments/${coverImage.id}` : null);
     
     // Return ONLY public-safe info (no user_id, no private notes, custom public title/desc)
     return jsonResponse({
@@ -583,7 +584,7 @@ export const TripsHandler = {
         title: trip.public_title || trip.name,
         description: trip.public_description || trip.description || '',
         contact: trip.public_contact || null,
-        cover_image: coverImage ? `${BASE_URL}/api/attachments/${coverImage.id}` : null,
+        cover_image: coverUrl,
         created_at: trip.created_at,
         waypoints: waypoints.results.map(w => ({
           id: w.id,
