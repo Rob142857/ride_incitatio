@@ -186,10 +186,32 @@ const Trip = {
    * Generate share ID if not exists
    */
   generateShareId(trip) {
+    this.ensureShareSettings(trip);
     if (!trip.shareSettings.shareId) {
-      trip.shareSettings.shareId = Storage.generateId();
+      trip.shareSettings.shareId = trip.share_id || trip.short_code || Storage.generateId();
     }
     return trip.shareSettings.shareId;
+  },
+
+  /**
+   * Ensure shareSettings exists and is aligned with server fields
+   */
+  ensureShareSettings(trip) {
+    if (!trip) return trip;
+    if (!trip.shareSettings) {
+      trip.shareSettings = {
+        shareId: trip.share_id || trip.short_code || Storage.generateId(),
+        isPublic: !!trip.is_public,
+        includePrivateNotes: false
+      };
+    } else {
+      trip.shareSettings.shareId = trip.shareSettings.shareId || trip.share_id || trip.short_code || Storage.generateId();
+      trip.shareSettings.isPublic = trip.shareSettings.isPublic ?? !!trip.is_public;
+      if (trip.shareSettings.includePrivateNotes === undefined) {
+        trip.shareSettings.includePrivateNotes = false;
+      }
+    }
+    return trip;
   },
 
   /**

@@ -148,6 +148,14 @@ const App = {
   },
 
   /**
+   * Enter riding mode (stub for upcoming riding view)
+   */
+  enterRideMode() {
+    UI.showToast('Riding view is coming soon', 'info');
+    // Placeholder: will route to riding screen when implemented
+  },
+
+  /**
    * Update UI for logged in user
    */
   updateUserUI() {
@@ -491,6 +499,8 @@ const App = {
    * Load trip data into the app
    */
   loadTripData(trip) {
+    // Normalize share settings for downstream sharing UI
+    Trip.ensureShareSettings(trip);
     this.currentTrip = trip;
     
     // Update UI
@@ -556,6 +566,9 @@ const App = {
         trip.waypoints = sharedData.waypoints || [];
         trip.journal = sharedData.journal || [];
         trip.customRoutePoints = sharedData.customRoutePoints || [];
+        trip.share_id = sharedData.share_id;
+        trip.short_code = sharedData.short_code;
+        trip.is_public = sharedData.is_public;
         
         this.loadTripData(trip);
         
@@ -594,8 +607,7 @@ const App = {
         });
       } catch (error) {
         console.error('Failed to save to cloud:', error);
-        // Fallback to local
-        Storage.saveTrip(this.currentTrip);
+        UI.showToast('Save failed. Not saved to cloud.', 'error');
       }
     } else {
       Storage.saveTrip(this.currentTrip);
@@ -617,8 +629,8 @@ const App = {
         this.currentTrip.waypoints.push(waypoint);
       } catch (error) {
         console.error('Failed to add waypoint to cloud:', error);
-        waypoint = Trip.addWaypoint(this.currentTrip, data);
-        Storage.saveTrip(this.currentTrip);
+        UI.showToast('Could not add waypoint (not saved)', 'error');
+        return null;
       }
     } else {
       waypoint = Trip.addWaypoint(this.currentTrip, data);
@@ -648,6 +660,8 @@ const App = {
         await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng });
       } catch (error) {
         console.error('Failed to update waypoint:', error);
+        UI.showToast('Move failed. Not saved to cloud.', 'error');
+        return;
       }
     }
     
@@ -707,6 +721,8 @@ const App = {
         await API.waypoints.reorder(this.currentTrip.id, orderIds);
       } catch (error) {
         console.error('Failed to reorder waypoints in cloud:', error);
+        UI.showToast('Reorder failed. Not saved to cloud.', 'error');
+        return;
       }
     }
 
@@ -737,8 +753,8 @@ const App = {
         this.currentTrip.journal.push(entry);
       } catch (error) {
         console.error('Failed to add journal entry:', error);
-        entry = Trip.addJournalEntry(this.currentTrip, data);
-        Storage.saveTrip(this.currentTrip);
+        UI.showToast('Note not saved to cloud.', 'error');
+        return null;
       }
     } else {
       entry = Trip.addJournalEntry(this.currentTrip, data);
@@ -761,6 +777,8 @@ const App = {
         await API.journal.delete(this.currentTrip.id, entryId);
       } catch (error) {
         console.error('Failed to delete journal entry:', error);
+        UI.showToast('Delete failed on cloud.', 'error');
+        return;
       }
     }
     

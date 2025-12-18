@@ -5,33 +5,51 @@ const Share = {
   /**
    * Open share modal and generate link
    */
-  openShareModal() {
-        // Set public toggle state
-        const publicToggle = document.getElementById('sharePublicToggle');
-        publicToggle.checked = !!App.currentTrip.is_public;
-        publicToggle.onchange = async (e) => {
-          try {
-            await API.trips.update(App.currentTrip.id, { is_public: e.target.checked });
-            App.currentTrip.is_public = e.target.checked;
-            UI.showToast(e.target.checked ? 'Trip is now public' : 'Trip is now private', 'success');
-          } catch {
-            UI.showToast('Failed to update sharing', 'error');
-            publicToggle.checked = !e.target.checked;
-          }
-        };
+  async openShareModal() {
+    // Set public toggle state
+    const publicToggle = document.getElementById('sharePublicToggle');
+    publicToggle.checked = !!App.currentTrip?.is_public;
+    publicToggle.onchange = async (e) => {
+      try {
+        await API.trips.update(App.currentTrip.id, { is_public: e.target.checked });
+        App.currentTrip.is_public = e.target.checked;
+        UI.showToast(e.target.checked ? 'Trip is now public' : 'Trip is now private', 'success');
+      } catch {
+        UI.showToast('Failed to update sharing', 'error');
+        publicToggle.checked = !e.target.checked;
+      }
+    };
     if (!App.currentTrip) {
       UI.showToast('No trip to share', 'error');
       return;
     }
 
-    // Generate share ID if needed
-    Trip.generateShareId(App.currentTrip);
-    App.saveCurrentTrip();
+    let shareUrl = '';
 
-    // Generate shareable link (root-level /shortcode)
-    const shareId = App.currentTrip.shareSettings.shareId;
-    const baseUrl = window.location.origin.replace(/\/$/, '');
-    const shareUrl = `${baseUrl}/${shareId}`;
+    // Cloud mode: generate short code + mark public via API
+    if (App.useCloud && App.currentUser) {
+      try {
+        const result = await API.trips.share(App.currentTrip.id);
+        if (result?.shortCode) {
+          App.currentTrip.short_code = result.shortCode;
+          App.currentTrip.is_public = true;
+          shareUrl = result.shareUrl || `${window.location.origin.replace(/\/$/, '')}/${result.shortCode}`;
+        }
+      } catch (err) {
+        console.error('Share link generation failed', err);
+        UI.showToast('Failed to generate share link', 'error');
+        return;
+      }
+    }
+
+    // Local/offline fallback
+    if (!shareUrl) {
+      Trip.generateShareId(App.currentTrip);
+      App.saveCurrentTrip();
+      const shareId = App.currentTrip.shareSettings.shareId;
+      const baseUrl = window.location.origin.replace(/\/$/, '');
+      shareUrl = `${baseUrl}/${shareId}`;
+    }
 
     document.getElementById('shareLink').value = shareUrl;
     UI.openModal('shareModal');

@@ -149,6 +149,11 @@ const UI = {
     document.getElementById('shareBtn').addEventListener('click', () => {
       Share.openShareModal();
     });
+
+    // Ride button
+    document.getElementById('rideBtn').addEventListener('click', () => {
+      App.enterRideMode();
+    });
   },
 
   /**
