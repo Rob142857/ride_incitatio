@@ -42,9 +42,46 @@
       padding: 32px 20px 48px;
     }
     
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+      padding: 48px 28px;
+      margin-bottom: 22px;
+      background: linear-gradient(135deg, rgba(233,69,96,0.16), rgba(59,130,246,0.12));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--hero-img, none);
+      background-size: cover;
+      background-position: center;
+      opacity: 0.88;
+      z-index: -2;
+      transition: opacity 0.2s ease;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(6,8,16,0.2) 0%, rgba(6,8,16,0.72) 60%, rgba(6,8,16,0.9) 100%);
+      z-index: -1;
+    }
+
+    .hero.has-cover {
+      color: #f9fbff;
+      text-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+
     .header {
       text-align: center;
-      padding: 36px 20px 28px;
+      padding: 0;
       display: grid;
       gap: 12px;
     }
@@ -104,20 +141,25 @@
       top: 12px;
       right: 12px;
       border: none;
-      background: var(--accent);
+      background: linear-gradient(135deg, #ff5f7a, #e94560);
       color: #fff;
-      padding: 10px 14px;
+      padding: 11px 16px;
       border-radius: 999px;
-      font-weight: 700;
-      letter-spacing: 0.2px;
+      font-weight: 800;
+      letter-spacing: 0.25px;
       cursor: pointer;
-      box-shadow: 0 10px 26px rgba(0,0,0,0.35);
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.18);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
     }
 
     .map-fab:hover {
       transform: translateY(-1px);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.22);
+    }
+
+    .map-fab:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
     }
 
     .map-legend,
@@ -125,14 +167,14 @@
       position: absolute;
       left: 12px;
       bottom: 12px;
-      background: rgba(12, 15, 28, 0.78);
-      color: #d9dbea;
+      background: rgba(0, 0, 0, 0.78);
+      color: #f6f7fb;
       padding: 8px 10px;
       border-radius: 10px;
       font-size: 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(6px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.45);
     }
 
     .map-watermark {
@@ -425,11 +467,13 @@
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <h1 id="tripName">Loading trip...</h1>
-      <p class="meta" id="tripMeta"></p>
-      <div class="hero-stats" id="tripStats"></div>
-    </header>
+    <section class="hero" id="hero">
+      <header class="header">
+        <h1 id="tripName">Loading trip...</h1>
+        <p class="meta" id="tripMeta"></p>
+        <div class="hero-stats" id="tripStats"></div>
+      </header>
+    </section>
     
     <div class="map-shell" id="mapShell">
       <div id="map"></div>
@@ -461,7 +505,8 @@
     </div>
     
     <p class="powered-by">
-      Powered by <a href="/">Ride Trip Planner</a>
+      Powered by <a href="/">Ride Trip Planner</a><br>
+      <a href="/">Try Ride — Free for the foreseeable future</a>
     </p>
   </div>
   
@@ -515,6 +560,16 @@
       document.getElementById('tripName').textContent = trip.name;
       document.getElementById('tripMeta').textContent = 
         `${trip.waypoints.length} waypoints • Created ${new Date(trip.createdAt).toLocaleDateString()}`;
+
+      // Cover image (if present)
+      const hero = document.getElementById('hero');
+      if (trip.cover_image_url) {
+        hero.style.setProperty('--hero-img', `url('${trip.cover_image_url}')`);
+        hero.classList.add('has-cover');
+      } else {
+        hero.style.removeProperty('--hero-img');
+        hero.classList.remove('has-cover');
+      }
       
       // Render waypoints
       renderWaypoints(trip.waypoints);
