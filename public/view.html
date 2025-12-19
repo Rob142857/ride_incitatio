@@ -58,13 +58,56 @@
       font-size: 0.95rem;
     }
     
+    .map-shell {
+      position: relative;
+      margin-bottom: 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
     #map {
       width: 100%;
       height: 420px;
-      border-radius: var(--radius);
-      margin-bottom: 24px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
+    }
+
+    .map-fab {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .map-fab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+
+    .map-shell.fullscreen {
+      position: fixed;
+      inset: 12px;
+      width: auto;
+      height: calc(100vh - 24px);
+      margin: 0;
+      z-index: 1200;
+      border-radius: 18px;
+    }
+
+    .map-shell.fullscreen #map {
+      height: 100%;
+    }
+
+    body.no-scroll {
       overflow: hidden;
     }
     
@@ -227,7 +270,10 @@
       <p class="meta" id="tripMeta"></p>
     </header>
     
-    <div id="map"></div>
+    <div class="map-shell" id="mapShell">
+      <div id="map"></div>
+      <button id="mapExpandBtn" class="map-fab" aria-label="Expand map">Expand map</button>
+    </div>
     
     <section class="section" id="waypointsSection">
       <h2>📍 Waypoints</h2>
@@ -256,9 +302,26 @@
     
     // Initialize map
     const map = L.map('map').setView([51.505, -0.09], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    const tileAttribution = '© OpenStreetMap contributors, © CARTO';
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: tileAttribution,
+      maxZoom: 19
     }).addTo(map);
+
+    // Fullscreen toggle for better map visibility when viewing shared trips
+    let mapFullscreen = false;
+    const mapShell = document.getElementById('mapShell');
+    const mapExpandBtn = document.getElementById('mapExpandBtn');
+
+    function toggleMapFullscreen() {
+      mapFullscreen = !mapFullscreen;
+      mapShell.classList.toggle('fullscreen', mapFullscreen);
+      document.body.classList.toggle('no-scroll', mapFullscreen);
+      mapExpandBtn.textContent = mapFullscreen ? 'Close map' : 'Expand map';
+      map.invalidateSize();
+    }
+
+    mapExpandBtn.addEventListener('click', toggleMapFullscreen);
     
     // Load trip data from localStorage (in real app, would fetch from server)
     function loadTrip() {
