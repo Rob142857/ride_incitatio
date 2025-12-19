@@ -79,6 +79,21 @@
       text-shadow: 0 8px 24px rgba(0,0,0,0.55);
     }
 
+    .hero.has-cover .meta {
+      color: #e6eafe;
+    }
+
+    .hero.has-cover .stat-pill {
+      background: rgba(0,0,0,0.42);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #f9fbff;
+      text-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    }
+
+    .hero.has-cover .stat-pill .label {
+      color: #cfd6ff;
+    }
+
     .header {
       text-align: center;
       padding: 0;
@@ -150,6 +165,7 @@
       cursor: pointer;
       box-shadow: 0 12px 30px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.18);
       transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+      z-index: 12;
     }
 
     .map-fab:hover {
@@ -175,6 +191,7 @@
       border: 1px solid rgba(255,255,255,0.16);
       backdrop-filter: blur(8px);
       box-shadow: 0 14px 40px rgba(0,0,0,0.45);
+      z-index: 11;
     }
 
     .map-watermark {
@@ -505,7 +522,7 @@
     </div>
     
     <p class="powered-by">
-      Powered by <a href="/">Ride Trip Planner</a><br>
+      <a href="/" aria-label="Go to Ride home">Powered by Ride Trip Planner</a><br>
       <a href="/">Try Ride — Free for the foreseeable future</a>
     </p>
   </div>
