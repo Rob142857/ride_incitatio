@@ -349,20 +349,8 @@ const App = {
       document.getElementById('ridePhotoInput')?.click();
     });
 
-    document.getElementById('ridePickPhotoBtn')?.addEventListener('click', () => {
-      document.getElementById('rideAddSheet')?.classList.add('hidden');
-      document.getElementById('ridePhotoPickInput')?.click();
-    });
-
     // Handle photo capture
     document.getElementById('ridePhotoInput')?.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (file) await this.addPhotoAttachment(file);
-      e.target.value = '';
-    });
-
-    // Handle photo pick from storage
-    document.getElementById('ridePhotoPickInput')?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (file) await this.addPhotoAttachment(file);
       e.target.value = '';
