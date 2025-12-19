@@ -15,6 +15,7 @@
   --accent: #111827;
   --border: var(--neutral-200);
   --radius: 0.5rem;
+  --radius-btn: 3px;
   --shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
   
   /* Elegant Archive-inspired additions */

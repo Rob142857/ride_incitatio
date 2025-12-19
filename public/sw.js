@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ride-v2-2025-12-19';
+const CACHE_NAME = 'ride-v3-2025-12-19';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -56,6 +56,12 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // Never cache API responses (prevents stale trip data after updates)
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   // Skip tile requests (let them go to network)
   if (url.hostname.includes('tile.openstreetmap.org')) {
