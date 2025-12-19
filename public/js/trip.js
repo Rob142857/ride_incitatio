@@ -17,6 +17,8 @@ const Trip = {
       customRoutePoints: [],
       journal: [],
       cover_image_url: '',
+      cover_focus_x: 50,
+      cover_focus_y: 50,
       is_public: false,
       short_code: null,
       settings: {
@@ -242,6 +244,9 @@ const Trip = {
       name: trip.name,
       description: trip.description,
       cover_image: trip.cover_image_url || null,
+      cover_image_url: trip.cover_image_url || null,
+      cover_focus_x: Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50,
+      cover_focus_y: Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50,
       waypoints: includeWaypoints ? trip.waypoints : [],
       route: includeRoute ? trip.route : null,
       customRoutePoints: includeRoute ? trip.customRoutePoints : [],

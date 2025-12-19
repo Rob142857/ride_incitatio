@@ -14,6 +14,9 @@ const API = {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
         ...options.headers
       },
       credentials: 'include', // Include cookies for session

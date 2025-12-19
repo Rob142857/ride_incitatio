@@ -140,6 +140,9 @@ const App = {
     const coverFileInput = document.getElementById('tripDetailCoverFile');
     const coverFileBtn = document.getElementById('tripDetailCoverFileBtn');
     const coverFileName = document.getElementById('tripDetailCoverFileName');
+    const coverInput = document.getElementById('tripDetailCover');
+    const focusXInput = document.getElementById('tripDetailCoverFocusX');
+    const focusYInput = document.getElementById('tripDetailCoverFocusY');
 
     if (form) {
       form.addEventListener('submit', (e) => {
@@ -153,6 +156,18 @@ const App = {
       coverFileInput.addEventListener('change', () => {
         coverFileName.textContent = coverFileInput.files?.[0]?.name || '';
       });
+    }
+
+    if (coverInput) {
+      coverInput.addEventListener('input', () => this.updateCoverFocusUI());
+    }
+
+    if (focusXInput) {
+      focusXInput.addEventListener('input', () => this.updateCoverFocusUI());
+    }
+
+    if (focusYInput) {
+      focusYInput.addEventListener('input', () => this.updateCoverFocusUI());
     }
 
     if (copyBtn) {
@@ -172,6 +187,31 @@ const App = {
       });
     }
 
+    this.updateCoverFocusUI();
+
+  },
+
+  updateCoverFocusUI() {
+    const coverInput = document.getElementById('tripDetailCover');
+    const preview = document.getElementById('tripDetailCoverPreview');
+    const focusXInput = document.getElementById('tripDetailCoverFocusX');
+    const focusYInput = document.getElementById('tripDetailCoverFocusY');
+    const focusXValue = document.getElementById('tripDetailCoverFocusXValue');
+    const focusYValue = document.getElementById('tripDetailCoverFocusYValue');
+
+    const xRaw = Number(focusXInput?.value);
+    const yRaw = Number(focusYInput?.value);
+    const x = Number.isFinite(xRaw) ? xRaw : 50;
+    const y = Number.isFinite(yRaw) ? yRaw : 50;
+
+    if (focusXValue) focusXValue.textContent = `${x}%`;
+    if (focusYValue) focusYValue.textContent = `${y}%`;
+
+    if (preview) {
+      const imageUrl = coverInput?.value?.trim();
+      preview.style.backgroundImage = imageUrl ? `url('${imageUrl}')` : 'none';
+      preview.style.backgroundPosition = `${x}% ${y}%`;
+    }
   },
 
   bindJournalAttachmentPicker() {
@@ -263,14 +303,15 @@ const App = {
       const hadUser = !!this.currentUser;
       const authed = await this.checkAuth();
       if (authed || hadUser) {
-        this.refreshTripsList();
+        // Pull fresh data when user returns to the tab
+        await this.refreshData('visibility');
       }
     });
 
     window.addEventListener('online', async () => {
       const authed = await this.checkAuth();
       if (authed) {
-        this.refreshTripsList();
+        await this.refreshData('online');
       }
     });
   },
@@ -734,6 +775,8 @@ const App = {
     if (normalized.waypoints) {
       normalized.waypoints = Trip.normalizeWaypointOrder(normalized.waypoints);
     }
+    if (!Number.isFinite(normalized.cover_focus_x)) normalized.cover_focus_x = 50;
+    if (!Number.isFinite(normalized.cover_focus_y)) normalized.cover_focus_y = 50;
     return normalized;
   },
 
@@ -827,6 +870,10 @@ const App = {
     document.getElementById('tripDetailDescription').value = trip.description || '';
     const coverInput = document.getElementById('tripDetailCover');
     if (coverInput) coverInput.value = trip.cover_image_url || '';
+    const focusXInput = document.getElementById('tripDetailCoverFocusX');
+    const focusYInput = document.getElementById('tripDetailCoverFocusY');
+    if (focusXInput) focusXInput.value = Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50;
+    if (focusYInput) focusYInput.value = Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50;
     const coverFileName = document.getElementById('tripDetailCoverFileName');
     if (coverFileName) coverFileName.textContent = '';
     document.getElementById('tripDetailPublic').checked = !!trip.is_public;
@@ -834,6 +881,7 @@ const App = {
     const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
     linkInput.value = link || '';
     document.getElementById('tripDetailsModal').dataset.tripId = trip.id;
+    this.updateCoverFocusUI();
   },
 
   async saveTripDetails() {
@@ -843,6 +891,10 @@ const App = {
     const coverFileInput = document.getElementById('tripDetailCoverFile');
     const coverFile = coverFileInput?.files?.[0];
     let coverImageUrl = coverInput?.value?.trim() || '';
+    const focusXRaw = Number(document.getElementById('tripDetailCoverFocusX')?.value);
+    const focusYRaw = Number(document.getElementById('tripDetailCoverFocusY')?.value);
+    const coverFocusX = Number.isFinite(focusXRaw) ? focusXRaw : 50;
+    const coverFocusY = Number.isFinite(focusYRaw) ? focusYRaw : 50;
     const isPublic = document.getElementById('tripDetailPublic').checked;
     const tripId = this.tripDetailId;
 
@@ -867,10 +919,13 @@ const App = {
         UI.showToast('Uploading cover image...', 'info');
         const attachment = await API.attachments.upload(tripId, coverFile, { is_cover: true });
         coverImageUrl = attachment.url;
-        if (coverInput) coverInput.value = coverImageUrl;
+        if (coverInput) {
+          coverInput.value = coverImageUrl;
+          this.updateCoverFocusUI();
+        }
       }
       if (this.useCloud && this.currentUser) {
-        await API.trips.update(tripId, { name, description, is_public: isPublic, cover_image_url: coverImageUrl || null });
+        await API.trips.update(tripId, { name, description, is_public: isPublic, cover_image_url: coverImageUrl || null, cover_focus_x: coverFocusX, cover_focus_y: coverFocusY });
 
         // Ensure short link exists when public (fixed code per trip)
         if (isPublic) {
@@ -887,6 +942,8 @@ const App = {
       }
 
       updatedTrip = this.normalizeTrip(updatedTrip);
+      updatedTrip.cover_focus_x = coverFocusX;
+      updatedTrip.cover_focus_y = coverFocusY;
 
       if (this.currentTrip?.id === updatedTrip.id) {
         this.currentTrip = { ...this.currentTrip, ...updatedTrip };
@@ -1017,6 +1074,9 @@ const App = {
         trip.share_id = sharedData.share_id;
         trip.short_code = sharedData.short_code;
         trip.is_public = sharedData.is_public;
+        trip.cover_image_url = sharedData.cover_image_url || sharedData.cover_image || '';
+        trip.cover_focus_x = Number.isFinite(sharedData.cover_focus_x) ? sharedData.cover_focus_x : 50;
+        trip.cover_focus_y = Number.isFinite(sharedData.cover_focus_y) ? sharedData.cover_focus_y : 50;
         
         this.loadTripData(trip);
         
@@ -1052,7 +1112,9 @@ const App = {
           description: this.currentTrip.description,
           settings: this.currentTrip.settings,
           route: this.currentTrip.route,
-          cover_image_url: this.currentTrip.cover_image_url
+          cover_image_url: this.currentTrip.cover_image_url,
+          cover_focus_x: this.currentTrip.cover_focus_x,
+          cover_focus_y: this.currentTrip.cover_focus_y
         });
       } catch (error) {
         console.error('Failed to save to cloud:', error);

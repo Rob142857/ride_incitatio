@@ -86,12 +86,12 @@
       position: relative;
       height: 60vh;
       min-height: 400px;
-      max-height: 600px;
-      overflow: hidden;
-    }
-    
-    .hero-image {
-      position: absolute;
+      background: linear-gradient(
+        180deg,
+        rgba(6, 8, 16, 0.65) 0%,
+        rgba(6, 8, 16, 0.78) 45%,
+        rgba(4, 5, 12, 0.9) 100%
+      );
       inset: 0;
       width: 100%;
       height: 100%;
@@ -99,9 +99,14 @@
     }
     
     .hero-placeholder {
-      position: absolute;
+      padding: 40px 24px;
       inset: 0;
       background: var(--gradient-1);
+      background: linear-gradient(135deg, rgba(4, 6, 14, 0.82), rgba(6, 10, 18, 0.72));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -158,26 +163,34 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      text-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     }
     
     .trip-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 16px;
-      color: var(--text-secondary);
+      color: #e8ecff;
       font-size: 14px;
+      margin-top: 6px;
     }
     
     .trip-meta-item {
       display: flex;
       align-items: center;
       gap: 6px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
     }
     
     .trip-meta-item svg {
       width: 16px;
       height: 16px;
       opacity: 0.7;
+      color: #f8fafc;
     }
     
     /* Main Content */
@@ -234,9 +247,9 @@
     .map-btn {
       padding: 8px 12px;
       border-radius: 999px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.12);
-      color: var(--text-primary);
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(145deg, rgba(6, 10, 18, 0.92), rgba(11, 17, 30, 0.88));
+      color: #f8fafc;
       cursor: pointer;
       font-weight: 600;
       font-size: 12px;
@@ -248,7 +261,8 @@
 
     .map-btn:hover {
       transform: translateY(-1px);
-      box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+      background: linear-gradient(145deg, rgba(10, 16, 28, 0.95), rgba(16, 24, 40, 0.9));
     }
 
     .map-card.fullscreen {
@@ -565,13 +579,14 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--accent);
-      color: white;
+      background: linear-gradient(135deg, #e94560, #3b82f6);
+      color: #fff;
       padding: 12px 24px;
       border-radius: 30px;
       font-weight: 600;
       text-decoration: none;
       transition: all 0.2s ease;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.15);
     }
     
     .footer-cta:hover {
@@ -1031,6 +1046,8 @@
       updateMeta('twitter:description', trip.description || 'Explore this trip on Ride');
 
       const heroImage = trip.cover_image || trip.cover_image_url;
+      const focusX = Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50;
+      const focusY = Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50;
       if (heroImage) {
         updateMeta('og:image', heroImage);
         updateMeta('twitter:image', heroImage);
@@ -1040,7 +1057,7 @@
       if (heroImage) {
         const heroContainer = document.getElementById('hero-image-container');
         heroContainer.className = '';
-        heroContainer.innerHTML = `<img class="hero-image" src="${heroImage}" alt="${trip.title}">`;
+        heroContainer.innerHTML = `<img class="hero-image" src="${heroImage}" alt="${trip.title}" style="object-position: ${focusX}% ${focusY}%;">`;
       }
       
       // Title
@@ -1545,7 +1562,14 @@
 
     async function loadPublicTrip(code) {
       try {
-        const res = await fetch(`/api/s/${code}`);
+        const res = await fetch(`/api/s/${code}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         if (res.status === 403) {
           showPrivate();
           return;

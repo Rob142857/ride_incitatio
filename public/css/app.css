@@ -1791,6 +1791,38 @@ body.ride-mode {
   gap: 8px 12px;
 }
 
+.cover-focus-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.cover-focus-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  background-size: cover;
+  background-position: 50% 50%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.cover-focus-controls {
+  display: grid;
+  gap: 6px;
+}
+
+.cover-focus-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.cover-focus-row input[type="range"] {
+  width: 100%;
+}
+
 .share-checkbox {
   display: inline-flex;
   align-items: center;

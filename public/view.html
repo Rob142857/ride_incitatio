@@ -60,7 +60,7 @@
       inset: 0;
       background: var(--hero-img, none);
       background-size: cover;
-      background-position: center;
+      background-position: var(--hero-pos, center);
       opacity: 0.88;
       z-index: -2;
       transition: opacity 0.2s ease;
@@ -580,11 +580,16 @@
 
       // Cover image (if present)
       const hero = document.getElementById('hero');
-      if (trip.cover_image_url) {
-        hero.style.setProperty('--hero-img', `url('${trip.cover_image_url}')`);
+      const coverUrl = trip.cover_image_url || trip.cover_image;
+      if (coverUrl) {
+        hero.style.setProperty('--hero-img', `url('${coverUrl}')`);
+        const focusX = Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50;
+        const focusY = Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50;
+        hero.style.setProperty('--hero-pos', `${focusX}% ${focusY}%`);
         hero.classList.add('has-cover');
       } else {
         hero.style.removeProperty('--hero-img');
+        hero.style.removeProperty('--hero-pos');
         hero.classList.remove('has-cover');
       }
       
