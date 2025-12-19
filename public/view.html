@@ -45,17 +45,43 @@
     .header {
       text-align: center;
       padding: 36px 20px 28px;
+      display: grid;
+      gap: 12px;
     }
-    
+
     .header h1 {
       font-size: clamp(2rem, 3vw, 2.6rem);
-      margin-bottom: 8px;
       letter-spacing: -0.01em;
     }
-    
+
     .header .meta {
       color: var(--text-muted);
       font-size: 0.95rem;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .stat-pill {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(233,69,96,0.18);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15px;
+    }
+
+    .stat-pill .label {
+      color: var(--text-muted);
+      font-weight: 500;
     }
     
     .map-shell {
@@ -65,6 +91,7 @@
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
       overflow: hidden;
+      background: #0c0f1c;
     }
 
     #map {
@@ -91,6 +118,50 @@
     .map-fab:hover {
       transform: translateY(-1px);
       box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+
+    .map-legend,
+    .map-watermark {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(12, 15, 28, 0.78);
+      color: #d9dbea;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    .map-watermark {
+      bottom: 12px;
+      left: auto;
+      right: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 10px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.start { background: #10b981; }
+    .legend-dot.end { background: #e94560; }
+
+    .map-watermark span {
+      opacity: 0.8;
     }
 
     .map-shell.fullscreen {
@@ -134,8 +205,8 @@
     }
     
     .waypoint {
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: auto 1fr;
       gap: 12px;
       padding: 12px 0;
       border-bottom: 1px solid var(--border);
@@ -164,15 +235,24 @@
       margin-bottom: 4px;
       letter-spacing: -0.01em;
     }
-    
+
     .waypoint-info p {
       color: var(--text-muted);
       font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .waypoint-meta {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 6px;
     }
     
     .journal-entry {
       padding: 14px 0;
       border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 8px;
     }
     
     .journal-entry:last-child {
@@ -187,7 +267,7 @@
     
     .journal-entry .content {
       color: var(--text-muted);
-      line-height: 1.7;
+      line-height: 1.6;
       white-space: pre-wrap;
     }
     
@@ -195,6 +275,13 @@
       color: var(--text-muted);
       font-size: 0.8rem;
       margin-top: 8px;
+    }
+
+    .read-more {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
     }
     
     .tags {
@@ -217,6 +304,79 @@
       text-align: center;
       color: var(--text-muted);
       padding: 40px 20px;
+    }
+
+    /* Gallery */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .gallery-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+
+    .gallery-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.2s ease;
+    }
+
+    .gallery-card:hover img {
+      transform: scale(1.02);
+    }
+
+    .gallery-card .caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 8px 10px;
+      background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 100%);
+      color: #fff;
+      font-size: 0.85rem;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+    }
+
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1400;
+      padding: 24px;
+    }
+
+    .lightbox.hidden { display: none; }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      background: rgba(255,255,255,0.14);
+      border: none;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 700;
     }
     
     .cta {
@@ -268,12 +428,23 @@
     <header class="header">
       <h1 id="tripName">Loading trip...</h1>
       <p class="meta" id="tripMeta"></p>
+      <div class="hero-stats" id="tripStats"></div>
     </header>
     
     <div class="map-shell" id="mapShell">
       <div id="map"></div>
       <button id="mapExpandBtn" class="map-fab" aria-label="Expand map">Expand map</button>
+      <div class="map-legend">
+        <span class="legend-row"><span class="legend-dot start"></span><span>Start</span></span>
+        <span class="legend-row"><span class="legend-dot end"></span><span>End</span></span>
+      </div>
+      <div class="map-watermark"><span>Carto Voyager</span> · <span>OSM</span></div>
     </div>
+
+    <section class="section" id="gallerySection" style="display: none;">
+      <h2>📸 Trip Gallery</h2>
+      <div id="galleryGrid" class="gallery-grid"></div>
+    </section>
     
     <section class="section" id="waypointsSection">
       <h2>📍 Waypoints</h2>
@@ -292,6 +463,11 @@
     <p class="powered-by">
       Powered by <a href="/">Ride Trip Planner</a>
     </p>
+  </div>
+  
+  <div id="lightbox" class="lightbox hidden" role="dialog" aria-label="Image preview">
+    <button class="lightbox-close" id="lightboxClose">Close</button>
+    <img id="lightboxImage" alt="Trip photo preview">
   </div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -342,17 +518,24 @@
       
       // Render waypoints
       renderWaypoints(trip.waypoints);
-      
+
       // Render public journal entries
       const publicEntries = trip.journal.filter(e => !e.isPrivate);
       renderJournal(publicEntries);
+
+      // Stats
+      renderStats(trip, publicEntries);
+
+      // Gallery
+      const galleryItems = getImageAttachments(trip);
+      renderGallery(galleryItems);
       
       // Add markers to map
       if (trip.waypoints.length > 0) {
         const bounds = [];
         trip.waypoints.forEach((wp, i) => {
           const marker = L.marker([wp.lat, wp.lng]).addTo(map);
-          marker.bindPopup(`<strong>${i + 1}. ${wp.name}</strong>`);
+          marker.bindPopup(`<strong>${i + 1}. ${escapeHtml(wp.name)}</strong>`);
           bounds.push([wp.lat, wp.lng]);
         });
         
@@ -373,15 +556,20 @@
         return;
       }
       
-      container.innerHTML = waypoints.map((wp, i) => `
-        <div class="waypoint">
-          <div class="waypoint-num">${i + 1}</div>
-          <div class="waypoint-info">
-            <h3>${escapeHtml(wp.name)}</h3>
-            ${wp.notes ? `<p>${escapeHtml(wp.notes)}</p>` : ''}
+      container.innerHTML = waypoints.map((wp, i) => {
+        const coords = `${Number(wp.lat).toFixed(4)}, ${Number(wp.lng).toFixed(4)}`;
+        const note = wp.notes ? `<p>${escapeHtml(wp.notes)}</p>` : '';
+        return `
+          <div class="waypoint">
+            <div class="waypoint-num">${i + 1}</div>
+            <div class="waypoint-info">
+              <h3>${escapeHtml(wp.name || 'Waypoint')}</h3>
+              ${note}
+              <div class="waypoint-meta">${coords}</div>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
     
     function renderJournal(entries) {
@@ -392,18 +580,123 @@
         return;
       }
       
-      container.innerHTML = entries.map(entry => `
-        <div class="journal-entry">
-          <h3>${escapeHtml(entry.title)}</h3>
-          <div class="content">${escapeHtml(entry.content)}</div>
-          ${entry.tags.length > 0 ? `
-            <div class="tags">
-              ${entry.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
-            </div>
-          ` : ''}
-          <div class="date">${new Date(entry.createdAt).toLocaleDateString()}</div>
+      container.innerHTML = entries.map(entry => {
+        const full = entry.content || '';
+        const isLong = full.length > 260;
+        const excerpt = isLong ? `${full.slice(0, 260)}…` : full;
+        const tags = entry.tags?.length ? `
+          <div class="tags">
+            ${entry.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+          </div>
+        ` : '';
+        return `
+          <div class="journal-entry">
+            <h3>${escapeHtml(entry.title || 'Note')}</h3>
+            <div class="content" data-full="${escapeHtml(full)}">${escapeHtml(excerpt)}</div>
+            ${isLong ? '<span class="read-more">Read more</span>' : ''}
+            ${tags}
+            <div class="date">${new Date(entry.createdAt).toLocaleDateString()}</div>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('.read-more').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const contentEl = btn.previousElementSibling;
+          contentEl.textContent = contentEl.getAttribute('data-full');
+          btn.remove();
+        });
+      });
+    }
+
+    function renderStats(trip, publicEntries) {
+      const statsEl = document.getElementById('tripStats');
+      const stats = [];
+
+      if (trip.route?.distance) {
+        stats.push({ icon: '🛣️', label: 'Distance', value: formatDistance(trip.route.distance) });
+      }
+      if (trip.route?.time) {
+        stats.push({ icon: '⏱️', label: 'Duration', value: formatDuration(trip.route.time) });
+      }
+      stats.push({ icon: '📍', label: 'Stops', value: `${trip.waypoints.length}` });
+      const photoCount = getImageAttachments(trip).length;
+      if (photoCount) stats.push({ icon: '📸', label: 'Photos', value: `${photoCount}` });
+      if (publicEntries?.length) stats.push({ icon: '📝', label: 'Notes', value: `${publicEntries.length}` });
+
+      statsEl.innerHTML = stats.map(s => `
+        <div class="stat-pill">
+          <span>${s.icon}</span>
+          <span><span class="label">${s.label}</span><br>${s.value}</span>
         </div>
       `).join('');
+    }
+
+    function getImageAttachments(trip) {
+      const items = [];
+      (trip.journal || []).forEach(entry => {
+        (entry.attachments || []).forEach(att => {
+          const url = att.url || att.href || att.path;
+          const name = att.original_name || att.filename || att.name || 'Photo';
+          const mime = (att.mime || att.mimetype || att.contentType || '').toLowerCase();
+          const isImage = mime.includes('image') || (url || '').match(/\.(png|jpe?g|gif|webp|heic)$/i);
+          if (url && isImage) items.push({ url, name });
+        });
+      });
+      return items;
+    }
+
+    function renderGallery(items) {
+      const section = document.getElementById('gallerySection');
+      const grid = document.getElementById('galleryGrid');
+      if (!items.length) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
+      grid.innerHTML = items.map(item => `
+        <div class="gallery-card" data-url="${item.url}" aria-label="${escapeHtml(item.name)}">
+          <img src="${item.url}" alt="${escapeHtml(item.name)}">
+          <div class="caption">${escapeHtml(item.name)}</div>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll('.gallery-card').forEach(card => {
+        card.addEventListener('click', () => openLightbox(card.dataset.url, card.getAttribute('aria-label')));
+      });
+    }
+
+    function openLightbox(url, alt) {
+      const lb = document.getElementById('lightbox');
+      const img = document.getElementById('lightboxImage');
+      img.src = url;
+      img.alt = alt || 'Trip photo';
+      lb.classList.remove('hidden');
+      document.body.classList.add('no-scroll');
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.add('hidden');
+      document.body.classList.remove('no-scroll');
+    }
+
+    document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+    document.getElementById('lightbox').addEventListener('click', (e) => {
+      if (e.target.id === 'lightbox') closeLightbox();
+    });
+
+    function formatDistance(meters) {
+      if (!meters || Number.isNaN(meters)) return '—';
+      if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+      return `${Math.round(meters)} m`;
+    }
+
+    function formatDuration(seconds) {
+      if (!seconds || Number.isNaN(seconds)) return '—';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.round((seconds % 3600) / 60);
+      if (hrs === 0) return `${mins} min`;
+      return `${hrs}h ${mins.toString().padStart(2, '0')}m`;
     }
     
     function escapeHtml(str) {
