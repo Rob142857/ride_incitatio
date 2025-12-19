@@ -68,6 +68,7 @@ const UI = {
           e.preventDefault();
         }
         if (delta > threshold && !triggered) {
+          if (App.isRefreshing) return;
           triggered = true;
           App.refreshData(view);
         }

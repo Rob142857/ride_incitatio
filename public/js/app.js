@@ -1460,9 +1460,12 @@ const App = {
       this.tripListCache = orderedTrips;
 
       const currentId = this.currentTrip?.id || null;
-      UI.renderTrips(orderedTrips, currentId);
+      const currentExists = currentId ? orderedTrips.some((t) => t.id === currentId) : false;
+      const fallbackTripId = orderedTrips[0]?.id ?? null;
+      const targetTripId = currentExists ? currentId : fallbackTripId;
 
-      const targetTripId = currentId || (orderedTrips[0]?.id ?? null);
+      UI.renderTrips(orderedTrips, targetTripId);
+
       if (!targetTripId) {
         MapManager.clear();
         UI.renderWaypoints([]);
@@ -1473,7 +1476,32 @@ const App = {
         return;
       }
 
-      const freshTrip = this.normalizeTrip(await API.trips.get(targetTripId));
+      const loadFreshTrip = async (tripId) => {
+        try {
+          return this.normalizeTrip(await API.trips.get(tripId));
+        } catch (err) {
+          if (err.status === 404) return null; // Gracefully handle missing trips
+          throw err;
+        }
+      };
+
+      let freshTrip = await loadFreshTrip(targetTripId);
+
+      // If the previously selected trip is gone, fall back to the first available
+      if (!freshTrip && fallbackTripId && fallbackTripId !== targetTripId) {
+        freshTrip = await loadFreshTrip(fallbackTripId);
+      }
+
+      if (!freshTrip) {
+        MapManager.clear();
+        UI.renderWaypoints([]);
+        UI.renderJournal([]);
+        UI.updateTripTitle('');
+        UI.updateTripStats(null);
+        UI.showToast('Trip not found. Please try again.', 'error');
+        return;
+      }
+
       this.loadTripData(freshTrip);
       UI.showToast('Latest data loaded', 'success');
     } catch (error) {

@@ -74,10 +74,70 @@ this.routingControl = L.Routing.control({
 });
 ```
 
-## 8) Maintenance tips
-- To update maps: download a fresh `*.osm.pbf`, rerun extract + contract, then restart the container.
+## 8) Keep data local (no per-request downloads)
+OSRM serves routes from the preprocessed `.osrm` files you keep on disk. Clients never download map data through your server—only route JSON. To avoid fetching data per request, keep the preprocessed dataset in a durable directory and reuse it across container restarts.
+
+### Suggested layout
+```bash
+sudo mkdir -p /srv/osrm/data
+sudo chown $USER:$USER /srv/osrm/data
+cd /srv/osrm/data
+```
+
+### One-time (or periodic) data prep
+```bash
+REGION_URL="https://download.geofabrik.de/australia-oceania/new-south-wales-latest.osm.pbf"
+curl -L "$REGION_URL" -o data.osm.pbf
+
+# Extract + contract once per dataset refresh
+docker run -t -v /srv/osrm/data:/data osrm/osrm-backend osrm-extract -p /opt/car.lua /data/data.osm.pbf
+docker run -t -v /srv/osrm/data:/data osrm/osrm-backend osrm-contract /data/data.osrm
+```
+
+### Run OSRM against the cached dataset
+```bash
+docker run -d \
+  --name osrm \
+  -p 5000:5000 \
+  -v /srv/osrm/data:/data \
+  osrm/osrm-backend osrm-routed --algorithm mld /data/data.osrm
+```
+
+The container reads the preprocessed files from `/srv/osrm/data`; no further map downloads occur during routing.
+
+### Updating data without downtime (rolling)
+1) Prepare new data beside the existing set (e.g., `/srv/osrm/data-2025-01`), run extract/contract there.
+2) Start a new container pointing at the new path on a different port (e.g., 5001) and health-check it.
+3) Switch your reverse proxy to the new port.
+4) Stop the old container and archive or delete the old data directory when satisfied.
+
+### Quick refresh script (weekly)
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+REGION_URL="https://download.geofabrik.de/australia-oceania/new-south-wales-latest.osm.pbf"
+DATA_DIR=/srv/osrm/data
+TMP_DIR=/srv/osrm/data-tmp
+
+rm -rf "$TMP_DIR" && mkdir -p "$TMP_DIR"
+curl -L "$REGION_URL" -o "$TMP_DIR/data.osm.pbf"
+docker run -t -v "$TMP_DIR":/data osrm/osrm-backend osrm-extract -p /opt/car.lua /data/data.osm.pbf
+docker run -t -v "$TMP_DIR":/data osrm/osrm-backend osrm-contract /data/data.osrm
+
+docker stop osrm || true
+docker rm osrm || true
+rm -rf "$DATA_DIR"
+mv "$TMP_DIR" "$DATA_DIR"
+docker run -d --name osrm -p 5000:5000 -v "$DATA_DIR":/data osrm/osrm-backend osrm-routed --algorithm mld /data/data.osrm
+```
+
+## 9) Maintenance tips
 - To stop/remove: `sudo docker stop osrm && sudo docker rm osrm`.
 - Monitor logs: `sudo docker logs -f osrm`.
+
+## 10) Rough sizing
+- Small region (state/province): 4 GB RAM is usually fine.
+- Whole-country extracts can need 8–16 GB+; adjust VM size accordingly.
 
 ## 9) Rough sizing
 - Small region (state/province): 4 GB RAM is usually fine.
