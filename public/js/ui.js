@@ -209,12 +209,14 @@ const UI = {
 
     // Add waypoint button
     document.getElementById('addWaypointBtn').addEventListener('click', () => {
+      if (!App.ensureEditable('add waypoints')) return;
       this.openModal('waypointModal');
       MapManager.enableAddWaypointMode();
     });
 
     // Add note button
     document.getElementById('addNoteBtn').addEventListener('click', () => {
+      if (!App.ensureEditable('add notes')) return;
       this.openModal('noteModal');
     });
 
@@ -269,15 +271,15 @@ const UI = {
    */
   bindForms() {
     // Waypoint form
-    document.getElementById('waypointForm').addEventListener('submit', (e) => {
+    document.getElementById('waypointForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      this.handleWaypointSubmit();
+      await this.handleWaypointSubmit();
     });
 
     // Note form
-    document.getElementById('noteForm').addEventListener('submit', (e) => {
+    document.getElementById('noteForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      this.handleNoteSubmit();
+      await this.handleNoteSubmit();
     });
   },
 
@@ -441,7 +443,8 @@ const UI = {
   /**
    * Handle waypoint form submit
    */
-  handleWaypointSubmit() {
+  async handleWaypointSubmit() {
+    if (!App.ensureEditable('add waypoints')) return;
     const name = document.getElementById('waypointName').value.trim();
     const address = document.getElementById('waypointAddress').value.trim();
     const lat = parseFloat(document.getElementById('waypointLat').value);
@@ -455,15 +458,17 @@ const UI = {
       return;
     }
 
-    App.addWaypoint({ name, address, lat, lng, type, notes });
-    this.closeModal('waypointModal');
-    this.showToast('Waypoint added', 'success');
+    const waypoint = await App.addWaypoint({ name, address, lat, lng, type, notes });
+    if (waypoint) {
+      this.closeModal('waypointModal');
+      this.showToast('Waypoint added', 'success');
+    }
   },
 
   /**
    * Handle note form submit
    */
-  handleNoteSubmit() {
+  async handleNoteSubmit() {
     const title = document.getElementById('noteTitle').value.trim();
     const content = document.getElementById('noteContent').value.trim();
     const isPrivate = document.getElementById('notePrivate').checked;
@@ -471,13 +476,17 @@ const UI = {
     const entryId = document.getElementById('noteEntryId').value.trim();
     const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(t => t) : [];
 
-    if (entryId) {
-      App.updateJournalEntry(entryId, { title, content, isPrivate, tags });
-    } else {
-      App.addJournalEntry({ title, content, isPrivate, tags });
+    const allowed = App.ensureEditable(entryId ? 'update notes' : 'add a note');
+    if (!allowed) return;
+
+    const result = entryId
+      ? await App.updateJournalEntry(entryId, { title, content, isPrivate, tags })
+      : await App.addJournalEntry({ title, content, isPrivate, tags });
+
+    if (result) {
+      this.closeModal('noteModal');
+      this.showToast(entryId ? 'Note updated' : 'Note added', 'success');
     }
-    this.closeModal('noteModal');
-    this.showToast(entryId ? 'Note updated' : 'Note added', 'success');
   },
 
   /**

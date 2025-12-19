@@ -37,6 +37,7 @@ const App = {
     const sharedTripId = urlParams.get('trip');
     const isEmbed = urlParams.get('embed') === 'true';
     const authError = urlParams.get('error');
+    const authErrorDesc = urlParams.get('error_description');
     this.isSharedView = !!sharedTripId;
     
     // Try to authenticate if cloud is available
@@ -55,9 +56,7 @@ const App = {
     this.bindSessionRefresh();
     
     if (authError) {
-      UI.showToast('Login failed. Please try again.', 'error');
-      // Clear the error from URL
-      window.history.replaceState({}, '', window.location.pathname);
+      this.handleAuthErrorFromUrl(authError, authErrorDesc);
     }
     
     if (sharedTripId) {
@@ -92,10 +91,34 @@ const App = {
       return false;
     } catch (error) {
       console.error('Auth check failed', error);
-      UI.showToast('Auth check failed. Working offline until re-auth.', 'info');
+      const msg = error.status === 401
+        ? 'Session expired. Please sign in again.'
+        : 'Auth check failed. Working offline until re-auth.';
+      UI.showToast(msg, 'info');
+      // Reset user so UI reflects logged-out state on auth errors
+      this.currentUser = null;
+      this.useCloud = false;
       // Preserve existing useCloud flag so we can retry when online/focused
       return false;
     }
+  },
+
+  handleAuthErrorFromUrl(code, description) {
+    let message = 'Login failed. Please try again.';
+    if (code === 'invalid_state') {
+      message = 'Login expired. Please try again.';
+    } else if (code === 'request_malformed' || code === 'invalid_request') {
+      message = 'Login request was invalid. Please retry.';
+    }
+    if (description) {
+      message = `${message} (${description})`;
+    }
+    UI.showToast(message, 'error');
+    // Strip auth error params to prevent repeated toasts when reloading
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('error');
+    cleanUrl.searchParams.delete('error_description');
+    window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
   },
 
   configureLoginLinks() {
@@ -340,12 +363,14 @@ const App = {
     // Add note from ride mode
     document.getElementById('rideAddNoteBtn')?.addEventListener('click', () => {
       document.getElementById('rideAddSheet')?.classList.add('hidden');
+      if (!this.ensureEditable('add a note')) return;
       UI.openModal('noteModal');
     });
 
     // Take photo from ride mode
     document.getElementById('rideAddPhotoBtn')?.addEventListener('click', () => {
       document.getElementById('rideAddSheet')?.classList.add('hidden');
+      if (!this.ensureEditable('add a photo')) return;
       document.getElementById('ridePhotoInput')?.click();
     });
 
@@ -374,10 +399,7 @@ const App = {
 
   async addPhotoAttachment(file) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to save photos.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('save photos')) return;
 
     const title = `Photo ${new Date().toLocaleString()}`;
     let entry;
@@ -707,6 +729,19 @@ const App = {
   handleOnlineChange(online) {
     this.isOnline = online;
     UI.showToast(online ? 'Back online' : 'You are offline', online ? 'success' : 'info');
+  },
+
+  ensureEditable(action = 'make changes') {
+    if (!this.currentUser || !this.useCloud) {
+      UI.showToast(`Sign in to ${action}.`, 'error');
+      UI.openModal('loginModal');
+      return false;
+    }
+    if (!this.isOnline) {
+      UI.showToast('Offline. Editing is disabled until you reconnect.', 'error');
+      return false;
+    }
+    return true;
   },
 
   /**
@@ -1122,10 +1157,7 @@ const App = {
    */
   async addWaypoint(data) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return null;
-    }
+    if (!this.ensureEditable('add waypoints')) return null;
 
     let waypoint;
     try {
@@ -1156,10 +1188,7 @@ const App = {
    */
   async updateWaypointPosition(waypointId, lat, lng) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('move waypoints')) return;
 
     try {
       await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng });
@@ -1185,10 +1214,7 @@ const App = {
    */
   async deleteWaypoint(waypointId) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('delete waypoints')) return;
     
     try {
       await API.waypoints.delete(this.currentTrip.id, waypointId);
@@ -1217,11 +1243,7 @@ const App = {
    */
   async reorderWaypoints(orderIds) {
     if (!this.currentTrip) return;
-
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('reorder waypoints')) return;
 
     // Update local order
     Trip.reorderWaypoints(this.currentTrip, orderIds);
@@ -1247,10 +1269,7 @@ const App = {
    */
   async addJournalEntry(data) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return null;
-    }
+    if (!this.ensureEditable('add notes')) return null;
 
     let entry;
     try {
@@ -1276,10 +1295,7 @@ const App = {
 
   async updateJournalEntry(entryId, data) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return null;
-    }
+    if (!this.ensureEditable('update notes')) return null;
     let updated;
     try {
       updated = await API.journal.update(this.currentTrip.id, entryId, {
@@ -1312,10 +1328,7 @@ const App = {
    */
   async deleteJournalEntry(entryId) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('delete notes')) return;
 
     try {
       await API.journal.delete(this.currentTrip.id, entryId);
@@ -1334,10 +1347,7 @@ const App = {
 
   async uploadJournalAttachment(entryId, file) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Sign in to upload attachments', 'error');
-      return;
-    }
+    if (!this.ensureEditable('upload attachments')) return;
     try {
       UI.showToast('Uploading attachment...', 'info');
       const attachment = await API.attachments.upload(this.currentTrip.id, file, { journal_entry_id: entryId });
@@ -1372,10 +1382,7 @@ const App = {
 
   async deleteAttachment(attachmentId, entryId) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Sign in to remove attachments', 'error');
-      return;
-    }
+    if (!this.ensureEditable('remove attachments')) return;
 
     try {
       await API.attachments.delete(attachmentId);
@@ -1401,10 +1408,7 @@ const App = {
    */
   saveRouteData(routeData) {
     if (!this.currentTrip) return;
-    if (!this.useCloud || !this.currentUser) {
-      UI.showToast('Login to edit trips.', 'error');
-      return;
-    }
+    if (!this.ensureEditable('save routes')) return;
     
     this.currentTrip.route = routeData;
     this.precomputeRouteMetrics();

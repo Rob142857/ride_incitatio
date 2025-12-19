@@ -584,9 +584,10 @@ body.ride-mode .panel-title {
 .ride-fab-group {
   position: absolute;
   bottom: calc(var(--safe-area-bottom) + 16px);
-  right: 12px;
+  left: 12px;
+  right: auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 10px;
 }
 
