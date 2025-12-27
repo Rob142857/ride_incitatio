@@ -413,11 +413,31 @@ export const TripsHandler = {
       return conflictResponse(trip);
     }
     
+    // Validate order contains every waypoint exactly once
+    const existingWps = await env.RIDE_TRIP_PLANNER_DB.prepare(
+      'SELECT id FROM waypoints WHERE trip_id = ?'
+    ).bind(params.tripId).all();
+
+    const existingIds = (existingWps.results || []).map((r) => r.id);
+    const desired = body.order.map((id) => String(id));
+    const uniqueDesired = new Set(desired);
+
+    if (desired.length !== existingIds.length || uniqueDesired.size !== desired.length) {
+      return errorResponse('Order must include each waypoint exactly once', 400);
+    }
+
+    const existingSet = new Set(existingIds);
+    for (const id of uniqueDesired) {
+      if (!existingSet.has(id)) {
+        return errorResponse('Order contains invalid waypoint id', 400);
+      }
+    }
+
     // Update each waypoint's order
-    for (let i = 0; i < body.order.length; i++) {
+    for (let i = 0; i < desired.length; i++) {
       await env.RIDE_TRIP_PLANNER_DB.prepare(
         'UPDATE waypoints SET sort_order = ? WHERE id = ? AND trip_id = ?'
-      ).bind(i, body.order[i], params.tripId).run();
+      ).bind(i, desired[i], params.tripId).run();
     }
     
     await bumpTripVersion(env, params.tripId);

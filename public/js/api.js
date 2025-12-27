@@ -224,63 +224,25 @@ const API = {
     async upload(tripId, file, options = {}) {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('is_cover', options.is_cover ? 'true' : 'false');
+      if (options.is_cover !== undefined) formData.append('is_cover', options.is_cover ? 'true' : 'false');
+      if (options.is_private !== undefined) formData.append('is_private', options.is_private ? 'true' : 'false');
+      if (options.caption !== undefined) formData.append('caption', String(options.caption || ''));
+      if (options.journal_entry_id) formData.append('journal_entry_id', options.journal_entry_id);
+      if (options.waypoint_id) formData.append('waypoint_id', options.waypoint_id);
 
-      let data;
-      try {
-        data = await fetch(`${API.baseUrl}/trips/${tripId}/attachments`, {
-          method: 'POST',
-          body: formData,
-          credentials: 'include',
-        }).then(async (res) => {
-          let body;
-          try {
-            body = await res.json();
-          } catch (_) {
-            const text = await res.text();
-            body = text ? { error: text } : {};
-          }
-
-          if (!res.ok) {
-            if (res.status === 401 && typeof window !== 'undefined') {
-              try {
-                window.dispatchEvent(new CustomEvent('ride:auth-expired', {
-                  detail: { endpoint: `/trips/${tripId}/attachments`, status: res.status }
-                }));
-              } catch (_) {}
-            }
-
-            if (res.status >= 500 && typeof window !== 'undefined') {
-              try {
-                window.dispatchEvent(new CustomEvent('ride:connection-lost', {
-                  detail: { endpoint: `/trips/${tripId}/attachments`, status: res.status, kind: 'server' }
-                }));
-              } catch (_) {}
-            }
-
-            const err = new Error(body.error || `Upload failed (${res.status})`);
-            err.status = res.status;
-            err.body = body;
-            throw err;
-          }
-
-          return body;
-        });
-      } catch (err) {
-        if (!err.status) {
-          err.status = 0;
-        }
-        if (err.status === 0 && typeof window !== 'undefined') {
-          try {
-            window.dispatchEvent(new CustomEvent('ride:connection-lost', {
-              detail: { endpoint: `/trips/${tripId}/attachments`, status: 0, kind: 'network' }
-            }));
-          } catch (_) {}
-        }
-        throw err;
-      }
-
+      const data = await API.request(`/trips/${tripId}/attachments`, {
+        method: 'POST',
+        body: formData,
+        headers: options.headers || {},
+      });
       return data.attachment;
+    },
+
+    async delete(attachmentId, options = {}) {
+      return API.request(`/attachments/${attachmentId}`, {
+        method: 'DELETE',
+        headers: options.headers || {},
+      });
     },
   },
 };

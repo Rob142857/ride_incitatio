@@ -707,15 +707,28 @@ const UI = {
             ${wp.notes ? `<div class="waypoint-notes">${this.escapeHtml(wp.notes)}</div>` : ''}
           </div>
           <div class="waypoint-actions">
-            <button class="icon-btn" onclick="MapManager.centerOnWaypoint(App.currentTrip.waypoints.find(w => w.id === '${wp.id}'))" aria-label="Center on map">
+            <button class="icon-btn" onclick="MapManager.centerOnWaypoint(App.currentTrip.waypoints.find(w => w.id === '${wp.id}')); event.stopPropagation();" aria-label="Center on map">
               <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
             </button>
-            <button class="icon-btn" onclick="App.deleteWaypoint('${wp.id}')" aria-label="Delete waypoint">
+            <button class="icon-btn" onclick="App.deleteWaypoint('${wp.id}'); event.stopPropagation();" aria-label="Delete waypoint">
               <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             </button>
           </div>
         </div>
       `).join('');
+
+    // Click to open waypoint details (avoid clicks from action buttons / drag handles)
+    container.querySelectorAll('.waypoint-item').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (container.classList.contains('is-reordering')) return;
+        if (e.target?.closest?.('.waypoint-actions')) return;
+        if (e.target?.closest?.('.waypoint-handle')) return;
+        const id = el.dataset.id;
+        if (!id) return;
+        if (!App.ensureEditable('edit waypoints')) return;
+        App.openWaypointDetails(id);
+      });
+    });
 
     // Drag & drop reordering (desktop) + touch reordering (mobile)
     // Bind once per container; items are re-rendered often.

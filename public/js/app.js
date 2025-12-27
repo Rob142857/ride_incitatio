@@ -444,7 +444,151 @@ const App = {
 
   bindEvents() {
     this.bindJournalAttachmentPicker();
+    this.bindWaypointDetails();
     this.bindRideControls();
+  },
+
+  bindWaypointDetails() {
+    const form = document.getElementById('waypointDetailsForm');
+    const fileInput = document.getElementById('waypointAttachmentFile');
+    const fileBtn = document.getElementById('waypointAttachmentBtn');
+    const fileName = document.getElementById('waypointAttachmentFileName');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('waypointDetailId')?.value || '';
+        const name = document.getElementById('waypointDetailName')?.value?.trim() || '';
+        const notes = document.getElementById('waypointDetailNotes')?.value?.trim() || '';
+        if (!id) return;
+        await this.updateWaypointDetails(id, { name, notes });
+      });
+    }
+
+    if (fileBtn && fileInput) {
+      fileBtn.addEventListener('click', () => {
+        const id = document.getElementById('waypointDetailId')?.value || '';
+        if (!id) {
+          UI.showToast('Open a waypoint first', 'info');
+          return;
+        }
+        fileInput.value = '';
+        fileInput.dataset.waypointId = id;
+        if (fileName) fileName.textContent = '';
+        fileInput.click();
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener('change', async () => {
+        const waypointId = fileInput.dataset.waypointId;
+        const file = fileInput.files?.[0];
+        if (fileName) fileName.textContent = file ? file.name : '';
+        if (!file || !waypointId) return;
+        await this.uploadWaypointAttachment(waypointId, file);
+      });
+    }
+  },
+
+  openWaypointDetails(waypointId) {
+    if (!this.currentTrip) return;
+    const wp = (this.currentTrip.waypoints || []).find((w) => w.id === waypointId);
+    if (!wp) return;
+    const idEl = document.getElementById('waypointDetailId');
+    const nameEl = document.getElementById('waypointDetailName');
+    const notesEl = document.getElementById('waypointDetailNotes');
+    if (idEl) idEl.value = wp.id;
+    if (nameEl) nameEl.value = wp.name || '';
+    if (notesEl) notesEl.value = wp.notes || '';
+    this.renderWaypointAttachments(wp.id);
+    UI.openModal('waypointDetailsModal');
+  },
+
+  renderWaypointAttachments(waypointId) {
+    const listEl = document.getElementById('waypointAttachmentList');
+    if (!listEl) return;
+    const all = Array.isArray(this.currentTrip?.attachments) ? this.currentTrip.attachments : [];
+    const attachments = all.filter((a) => a && a.waypoint_id === waypointId);
+    if (!attachments.length) {
+      listEl.innerHTML = '<div class="microcopy">No attachments yet.</div>';
+      return;
+    }
+
+    listEl.innerHTML = attachments.map((att) => {
+      const name = UI.escapeHtml(att.original_name || att.filename || att.name || 'Attachment');
+      return `
+        <div class="attachment-pill" data-attachment-id="${att.id}">
+          <a href="${att.url}" target="_blank" rel="noopener">${name}</a>
+          <button type="button" class="attachment-remove" data-attachment-id="${att.id}" aria-label="Remove attachment">×</button>
+        </div>
+      `;
+    }).join('');
+
+    listEl.querySelectorAll('.attachment-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const attachmentId = btn.dataset.attachmentId;
+        if (attachmentId) this.deleteAttachment(attachmentId);
+      });
+    });
+  },
+
+  async updateWaypointDetails(waypointId, data) {
+    if (!this.currentTrip) return;
+    if (!this.ensureEditable('update waypoints')) return;
+
+    try {
+      const res = await API.waypoints.update(this.currentTrip.id, waypointId, {
+        name: data.name,
+        notes: data.notes,
+      }, { headers: this.getTripIfMatchHeaders() });
+      this.applyTripMetaFromResponse(this.currentTrip, res);
+      if (res?.waypoint) {
+        Trip.updateWaypoint(this.currentTrip, waypointId, res.waypoint);
+        this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
+      } else {
+        Trip.updateWaypoint(this.currentTrip, waypointId, { name: data.name, notes: data.notes });
+      }
+      this.markTripWritten(this.currentTrip.id);
+      await this.saveCurrentTrip();
+      UI.renderWaypoints(this.currentTrip.waypoints);
+      MapManager.updateWaypoints(this.currentTrip.waypoints);
+      UI.showToast('Waypoint saved', 'success');
+      await this.refreshTripsList();
+    } catch (error) {
+      console.error('Failed to update waypoint details:', error);
+      if (error.status === 409) {
+        await this.handleTripConflict(error);
+        return;
+      }
+      UI.showToast('Waypoint update failed. Not saved.', 'error');
+    }
+  },
+
+  async uploadWaypointAttachment(waypointId, file) {
+    if (!this.currentTrip) return;
+    if (!this.ensureEditable('upload attachments')) return;
+
+    try {
+      UI.showToast('Uploading attachment...', 'info');
+      const attachment = await API.attachments.upload(this.currentTrip.id, file, {
+        waypoint_id: waypointId,
+        is_private: false,
+        headers: this.getTripIfMatchHeaders(),
+      });
+      if (!this.currentTrip.attachments) this.currentTrip.attachments = [];
+      const exists = this.currentTrip.attachments.some((a) => a.id === attachment.id);
+      if (!exists) this.currentTrip.attachments.unshift(attachment);
+      UI.showToast('Attachment uploaded', 'success');
+      this.renderWaypointAttachments(waypointId);
+    } catch (err) {
+      console.error('Waypoint attachment upload failed', err);
+      if (err.status === 409) {
+        await this.handleTripConflict(err);
+        return;
+      }
+      UI.showToast('Attachment upload failed', 'error');
+    }
   },
 
   bindRideControls() {
@@ -1396,6 +1540,10 @@ const App = {
     try {
       const res = await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng }, { headers: this.getTripIfMatchHeaders() });
       this.applyTripMetaFromResponse(this.currentTrip, res);
+      if (res?.waypoint) {
+        Trip.updateWaypoint(this.currentTrip, waypointId, res.waypoint);
+        this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
+      }
     } catch (error) {
       console.error('Failed to update waypoint:', error);
       if (error.status === 409) {
@@ -1405,8 +1553,10 @@ const App = {
       UI.showToast('Move failed. Not saved to cloud.', 'error');
       return;
     }
-    
-    Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
+
+    if (!this.currentTrip.waypoints?.some((w) => w.id === waypointId && w.lat === lat && w.lng === lng)) {
+      Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
+    }
     this.markTripWritten(this.currentTrip.id);
     await this.saveCurrentTrip();
 
@@ -1624,7 +1774,7 @@ const App = {
     if (!this.ensureEditable('remove attachments')) return;
 
     try {
-      await API.attachments.delete(attachmentId);
+      await API.attachments.delete(attachmentId, { headers: this.getTripIfMatchHeaders() });
       this.removeAttachmentFromState(attachmentId);
       UI.showToast('Attachment removed', 'success');
     } catch (err) {
@@ -1639,6 +1789,13 @@ const App = {
       if (entry) {
         this.renderNoteAttachments(entry);
       }
+    }
+
+    // If waypoint details modal is open, refresh its attachment list too.
+    const wpModal = document.getElementById('waypointDetailsModal');
+    if (wpModal && !wpModal.classList.contains('hidden')) {
+      const waypointId = document.getElementById('waypointDetailId')?.value || '';
+      if (waypointId) this.renderWaypointAttachments(waypointId);
     }
   },
 

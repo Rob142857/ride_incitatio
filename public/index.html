@@ -291,6 +291,44 @@
       </div>
     </div>
 
+    <div id="waypointDetailsModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Waypoint Details</h3>
+          <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+        </div>
+        <p class="modal-subtitle">Rename this stop, keep notes, or attach a photo.</p>
+        <form id="waypointDetailsForm">
+          <input type="hidden" id="waypointDetailId">
+          <label class="field-label">Title</label>
+          <input type="text" id="waypointDetailName" placeholder="Waypoint title" required>
+
+          <label class="field-label">Notes</label>
+          <textarea id="waypointDetailNotes" placeholder="Notes (optional)" rows="6"></textarea>
+
+          <div class="field-row">
+            <label class="field-label">Attach a photo</label>
+            <div class="pill-actions">
+              <input type="file" id="waypointAttachmentFile" accept="image/*" class="hidden">
+              <button type="button" class="secondary-btn" id="waypointAttachmentBtn">Choose file</button>
+              <span class="microcopy" id="waypointAttachmentFileName"></span>
+            </div>
+            <p class="microcopy">Uploads to this waypoint.</p>
+          </div>
+
+          <div class="field-row attachments-row">
+            <label class="field-label">Attachments</label>
+            <div id="waypointAttachmentList" class="note-attachments"></div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="cancel-btn" data-close>Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="placeSearchModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">

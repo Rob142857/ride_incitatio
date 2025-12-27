@@ -123,14 +123,28 @@ const Trip = {
    * Reorder waypoints
    */
   reorderWaypoints(trip, waypointIds) {
+    const existing = Array.isArray(trip?.waypoints) ? trip.waypoints : [];
+    const byId = new Map(existing.map((w) => [w.id, w]));
+
     const reordered = [];
-    waypointIds.forEach((id, index) => {
-      const waypoint = trip.waypoints.find(w => w.id === id);
-      if (waypoint) {
-        waypoint.order = index;
-        reordered.push(waypoint);
-      }
+    const seen = new Set();
+    (Array.isArray(waypointIds) ? waypointIds : []).forEach((id) => {
+      const waypoint = byId.get(id);
+      if (!waypoint || seen.has(id)) return;
+      seen.add(id);
+      reordered.push(waypoint);
     });
+
+    // Append any waypoints that were not present in waypointIds (defensive)
+    existing.forEach((w) => {
+      if (w && w.id && !seen.has(w.id)) reordered.push(w);
+    });
+
+    // Re-number order contiguously
+    reordered.forEach((w, idx) => {
+      w.order = idx;
+    });
+
     trip.waypoints = reordered;
     trip.updatedAt = new Date().toISOString();
   },
