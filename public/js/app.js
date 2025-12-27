@@ -16,6 +16,9 @@ const App = {
   loginPromptShown: false,
   tripDetailId: null,
   tripListCache: [],
+  // In-memory cache of last known-good full trip payloads by id.
+  // Used to avoid clobbering waypoint order with an older server read.
+  tripDataCache: {},
   waypointSaveToastAt: 0,
   isReorderingWaypoints: false,
   // Track the last time this tab successfully mutated a given trip.
@@ -550,7 +553,6 @@ const App = {
         Trip.updateWaypoint(this.currentTrip, waypointId, { name: data.name, notes: data.notes });
       }
       this.markTripWritten(this.currentTrip.id);
-      await this.saveCurrentTrip();
       UI.renderWaypoints(this.currentTrip.waypoints);
       MapManager.updateWaypoints(this.currentTrip.waypoints);
       UI.showToast('Waypoint saved', 'success');
@@ -1084,6 +1086,16 @@ const App = {
     this.tripWriteClock[tripId] = Date.now();
   },
 
+  cacheTripData(trip) {
+    if (!trip || !trip.id) return;
+    if (!this.tripDataCache) this.tripDataCache = {};
+    this.tripDataCache[trip.id] = trip;
+  },
+
+  getCachedTrip(tripId) {
+    return this.tripDataCache?.[tripId] || null;
+  },
+
   getTripIfMatchHeaders(trip = this.currentTrip) {
     const version = Number(trip?.version);
     if (!Number.isFinite(version)) return {};
@@ -1330,6 +1342,7 @@ const App = {
     }
     this.attachJournalAttachments(trip);
     this.currentTrip = trip;
+    this.cacheTripData(trip);
     
     // Update UI
     UI.updateTripTitle(trip.name);
@@ -1371,7 +1384,64 @@ const App = {
   async loadTrip(tripId) {
     if (this.useCloud && this.currentUser) {
       try {
-        const trip = await API.trips.get(tripId);
+        const trip = this.normalizeTrip(await API.trips.get(tripId));
+
+        // Guard against stale reads overwriting a freshly reordered waypoint list.
+        // This can happen with replica lag: another edge may briefly serve an older
+        // trip version and old waypoint sort_order after a successful reorder.
+        const cached = this.getCachedTrip(tripId);
+        const localWriteAt = this.tripWriteClock?.[tripId] || 0;
+        const sinceWriteMs = localWriteAt ? (Date.now() - localWriteAt) : Infinity;
+        const serverV = Number(trip?.version);
+        const cachedV = Number(cached?.version);
+        const serverTs = this.getTripSortTimestamp(trip);
+        const cachedTs = this.getTripSortTimestamp(cached);
+
+        const serverLooksOlderThanCache = !!cached && (
+          (Number.isFinite(serverV) && Number.isFinite(cachedV) && serverV < cachedV)
+          // Only consider timestamp lag during a short window after a local write.
+          // This avoids noisy warnings when versions are equal and no recent write occurred.
+          || (sinceWriteMs >= 0 && sinceWriteMs < 15000 && cachedTs && serverTs && serverTs + 1500 < cachedTs)
+        );
+
+        if (serverLooksOlderThanCache) {
+          console.warn('loadTrip returned older trip data; keeping cached and retrying', {
+            tripId,
+            serverV,
+            cachedV,
+            serverTs,
+            cachedTs,
+            localWriteAt,
+          });
+
+          // Keep UI stable on the cached (newer) version.
+          if (cached) {
+            this.loadTripData(cached);
+          }
+          this.refreshTripsList();
+          UI.switchView('map');
+          UI.showToast(`Loaded: ${cached?.name || trip.name}`, 'success');
+
+          setTimeout(async () => {
+            try {
+              if (!this.useCloud || !this.currentUser) return;
+              if (this.currentTrip?.id !== tripId) return;
+              const retryTrip = this.normalizeTrip(await API.trips.get(tripId));
+
+              const retryServerV = Number(retryTrip?.version);
+              const retryCachedV = Number(this.getCachedTrip(tripId)?.version);
+              if (Number.isFinite(retryServerV) && Number.isFinite(retryCachedV) && retryServerV < retryCachedV) {
+                return;
+              }
+              this.loadTripData(retryTrip);
+            } catch (_) {
+              // ignore retry errors
+            }
+          }, 1500);
+
+          return;
+        }
+
         this.loadTripData(trip);
         this.refreshTripsList();
         UI.switchView('map');
@@ -1558,7 +1628,6 @@ const App = {
       Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
     }
     this.markTripWritten(this.currentTrip.id);
-    await this.saveCurrentTrip();
 
     const now = Date.now();
     if (now - (this.waypointSaveToastAt || 0) > 2500) {
@@ -1595,7 +1664,6 @@ const App = {
     
     Trip.removeWaypoint(this.currentTrip, waypointId);
     this.markTripWritten(this.currentTrip.id);
-    this.saveCurrentTrip();
     
     MapManager.removeWaypointMarker(waypointId);
     UI.renderWaypoints(this.currentTrip.waypoints);
@@ -1630,8 +1698,6 @@ const App = {
       // Persist
       const res = await API.waypoints.reorder(this.currentTrip.id, orderIds, { headers: this.getTripIfMatchHeaders() });
       this.applyTripMetaFromResponse(this.currentTrip, res);
-
-      await this.saveCurrentTrip();
       this.markTripWritten(this.currentTrip.id);
 
       // Refresh UI and map
@@ -1969,13 +2035,14 @@ const App = {
       // Guard against clobbering: if we *just* wrote in this tab and the server read
       // appears older, keep local state and retry once shortly after.
       const localWriteAt = this.tripWriteClock?.[freshTrip.id] || 0;
+      const sinceWriteMs = localWriteAt ? (Date.now() - localWriteAt) : Infinity;
       const serverV = Number(freshTrip?.version);
       const localV = Number(this.currentTrip?.version);
       const serverTs = this.getTripSortTimestamp(freshTrip);
       const localTs = this.getTripSortTimestamp(this.currentTrip);
       const serverLooksOlderThanLocal = (Number.isFinite(serverV) && Number.isFinite(localV) && serverV < localV)
-        || (localWriteAt && serverTs && serverTs + 1000 < localWriteAt)
-        || (localTs && serverTs && serverTs < localTs);
+        // Only consider timestamp lag during a short window after a local write.
+        || (sinceWriteMs >= 0 && sinceWriteMs < 15000 && localTs && serverTs && serverTs + 1500 < localTs);
 
       if (source === 'visibility' && serverLooksOlderThanLocal) {
         console.warn('Refresh returned older trip data; retrying shortly', { source, tripId: freshTrip.id, serverTs, localTs, localWriteAt });
@@ -1993,10 +2060,10 @@ const App = {
             const retryServerTs = this.getTripSortTimestamp(retryTrip);
             const retryLocalTs = this.getTripSortTimestamp(this.currentTrip);
             const retryLocalWriteAt = this.tripWriteClock?.[retryTrip.id] || 0;
+            const retrySinceWriteMs = retryLocalWriteAt ? (Date.now() - retryLocalWriteAt) : Infinity;
 
             const retryStillOlder = (Number.isFinite(retryServerV) && Number.isFinite(retryLocalV) && retryServerV < retryLocalV)
-              || (retryLocalWriteAt && retryServerTs && retryServerTs + 1000 < retryLocalWriteAt)
-              || (retryLocalTs && retryServerTs && retryServerTs < retryLocalTs);
+              || (retrySinceWriteMs >= 0 && retrySinceWriteMs < 15000 && retryLocalTs && retryServerTs && retryServerTs + 1500 < retryLocalTs);
 
             if (retryStillOlder) {
               console.warn('Retry still returned older trip data; keeping local state', {

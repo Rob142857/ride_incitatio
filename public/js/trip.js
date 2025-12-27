@@ -39,12 +39,15 @@ const Trip = {
    */
   normalizeWaypointOrder(waypoints = []) {
     return (Array.isArray(waypoints) ? waypoints : []).map((wp, idx) => {
-      const order = Number.isFinite(wp.order)
-        ? wp.order
-        : Number.isFinite(wp.sort_order)
-          ? wp.sort_order
+      // In cloud mode, the authoritative persisted ordering is `sort_order`.
+      // Prefer it whenever present to avoid stale `order` fields clobbering
+      // server state after merges/updates.
+      const order = Number.isFinite(wp.sort_order)
+        ? wp.sort_order
+        : Number.isFinite(wp.order)
+          ? wp.order
           : idx;
-      return { ...wp, order };
+      return { ...wp, order, sort_order: Number.isFinite(wp.sort_order) ? wp.sort_order : order };
     }).sort((a, b) => a.order - b.order);
   },
 
@@ -61,6 +64,7 @@ const Trip = {
       type: data.type || 'stop',
       notes: data.notes || '',
       order: data.order || 0,
+      sort_order: data.sort_order ?? (data.order || 0),
       createdAt: new Date().toISOString()
     };
   },
@@ -115,7 +119,10 @@ const Trip = {
   removeWaypoint(trip, waypointId) {
     trip.waypoints = trip.waypoints.filter(w => w.id !== waypointId);
     // Reorder remaining waypoints
-    trip.waypoints.forEach((w, i) => w.order = i);
+    trip.waypoints.forEach((w, i) => {
+      w.order = i;
+      w.sort_order = i;
+    });
     trip.updatedAt = new Date().toISOString();
   },
 
@@ -143,6 +150,7 @@ const Trip = {
     // Re-number order contiguously
     reordered.forEach((w, idx) => {
       w.order = idx;
+      w.sort_order = idx;
     });
 
     trip.waypoints = reordered;

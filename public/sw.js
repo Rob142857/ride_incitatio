@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ride-v3-2025-12-19';
+const CACHE_NAME = 'ride-v4-2025-12-27';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -60,6 +60,30 @@ self.addEventListener('fetch', (event) => {
   // Never cache API responses (prevents stale trip data after updates)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  // For app shell assets, prefer network so deploys propagate immediately.
+  // Still fall back to cache for offline support.
+  const isAppShellAsset = url.origin === self.location.origin && (
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname.startsWith('/css/') ||
+    url.pathname.startsWith('/js/') ||
+    url.pathname.startsWith('/icons/')
+  );
+
+  if (isAppShellAsset) {
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
     return;
   }
 
