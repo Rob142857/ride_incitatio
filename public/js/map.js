@@ -255,19 +255,41 @@ const MapManager = {
   /**
    * Locate user and center map
    */
-  locateUser() {
-    if ('geolocation' in navigator) {
+  locateUser(options = {}) {
+    const toast = !!options.toast;
+    const animate = options.animate !== false;
+    const desiredZoom = Number.isFinite(options.zoom)
+      ? options.zoom
+      : Math.max((this.map?.getZoom?.() || 13), 14);
+
+    return new Promise((resolve, reject) => {
+      if (!('geolocation' in navigator)) {
+        if (toast) UI.showToast('Location not available on this device', 'error');
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          this.map.setView([latitude, longitude], 13);
+          if (this.map) {
+            this.map.setView([latitude, longitude], desiredZoom, { animate });
+          }
+          resolve({ lat: latitude, lng: longitude });
         },
         (error) => {
           console.log('Geolocation error:', error);
+          if (toast) {
+            const msg = error?.code === 1
+              ? 'Location permission denied'
+              : 'Unable to get your location';
+            UI.showToast(msg, 'error');
+          }
+          reject(error);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
-    }
+    });
   },
 
   /**
@@ -439,7 +461,7 @@ const MapManager = {
     if (waypoints.length < 2) return;
 
     // Create waypoints for routing
-    const routeWaypoints = waypoints
+    const routeWaypoints = [...waypoints]
       .sort((a, b) => a.order - b.order)
       .map(wp => L.latLng(wp.lat, wp.lng));
 

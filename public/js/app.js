@@ -18,6 +18,9 @@ const App = {
   tripListCache: [],
   waypointSaveToastAt: 0,
   isReorderingWaypoints: false,
+  // Track the last time this tab successfully mutated a given trip.
+  // Used to avoid clobbering newer local state with an older server read on tab refocus.
+  tripWriteClock: {},
 
   /**
    * Initialize the application
@@ -931,6 +934,12 @@ const App = {
     return ts ? new Date(ts).getTime() : 0;
   },
 
+  markTripWritten(tripId) {
+    if (!tripId) return;
+    if (!this.tripWriteClock) this.tripWriteClock = {};
+    this.tripWriteClock[tripId] = Date.now();
+  },
+
   applyTripOrder(trips) {
     const normalizedTrips = trips.map((t) => this.normalizeTrip(t));
     const order = Storage.getTripOrder() || [];
@@ -1302,6 +1311,8 @@ const App = {
       if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
       this.currentTrip.waypoints.push(waypoint);
       this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
+      this.currentTrip.updatedAt = new Date().toISOString();
+      this.markTripWritten(this.currentTrip.id);
     } catch (error) {
       console.error('Failed to add waypoint to cloud:', error);
       UI.showToast('Could not add waypoint (not saved)', 'error');
@@ -1340,6 +1351,10 @@ const App = {
     }
     
     Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
+    // Mark locally as updated immediately so a quick tab switch doesn't clobber
+    // this new state if the subsequent refresh hits an older replica/edge.
+    this.currentTrip.updatedAt = new Date().toISOString();
+    this.markTripWritten(this.currentTrip.id);
     await this.saveCurrentTrip();
 
     const now = Date.now();
@@ -1371,6 +1386,8 @@ const App = {
     }
     
     Trip.removeWaypoint(this.currentTrip, waypointId);
+    this.currentTrip.updatedAt = new Date().toISOString();
+    this.markTripWritten(this.currentTrip.id);
     this.saveCurrentTrip();
     
     MapManager.removeWaypointMarker(waypointId);
@@ -1407,6 +1424,9 @@ const App = {
       await API.waypoints.reorder(this.currentTrip.id, orderIds);
 
       await this.saveCurrentTrip();
+
+      this.currentTrip.updatedAt = new Date().toISOString();
+      this.markTripWritten(this.currentTrip.id);
 
       // Refresh UI and map
       UI.renderWaypoints(this.currentTrip.waypoints);
@@ -1593,6 +1613,7 @@ const App = {
 
     const ok = await this.saveCurrentTrip();
     if (ok) {
+      this.markTripWritten(this.currentTrip.id);
       UI.showToast('New route saved', 'success');
       await this.refreshTripsList();
     } else {
@@ -1725,6 +1746,30 @@ const App = {
         UI.updateTripTitle('');
         UI.updateTripStats(null);
         UI.showToast('Trip not found. Please try again.', 'error');
+        return;
+      }
+
+      // Guard against clobbering: if we *just* wrote in this tab and the server read
+      // appears older, keep local state and retry once shortly after.
+      const localWriteAt = this.tripWriteClock?.[freshTrip.id] || 0;
+      const serverTs = this.getTripSortTimestamp(freshTrip);
+      const localTs = this.getTripSortTimestamp(this.currentTrip);
+      const serverLooksOlderThanLocal = (localWriteAt && serverTs && serverTs + 1000 < localWriteAt) || (localTs && serverTs && serverTs < localTs);
+
+      if (source === 'visibility' && serverLooksOlderThanLocal) {
+        console.warn('Refresh returned older trip data; retrying shortly', { source, tripId: freshTrip.id, serverTs, localTs, localWriteAt });
+        setTimeout(async () => {
+          try {
+            if (!this.useCloud || !this.currentUser) return;
+            // Only retry if we're still on the same trip.
+            if (this.currentTrip?.id !== freshTrip.id) return;
+            const retryTrip = await loadFreshTrip(freshTrip.id);
+            if (!retryTrip) return;
+            this.loadTripData(retryTrip);
+          } catch (e) {
+            // ignore retry errors
+          }
+        }, 1500);
         return;
       }
 

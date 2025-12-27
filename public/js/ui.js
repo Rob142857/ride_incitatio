@@ -21,11 +21,27 @@ const UI = {
     this.bindPullToRefresh();
     this.bindPlaceSearch();
     this.bindFullscreen();
+    this.bindLocateButton();
     this.bindAuthGate();
     this.bindLandingGate();
     const attachmentList = document.getElementById('noteAttachmentList');
     if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
     return this;
+  },
+
+  bindLocateButton() {
+    const btn = document.getElementById('locateBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await MapManager.locateUser({ toast: true, animate: true });
+      } catch (err) {
+        // MapManager handles messaging
+      }
+    });
+
+    // Initial visibility: map view only
+    btn.classList.toggle('hidden', this.currentView !== 'map');
   },
 
   bindAuthGate() {
@@ -194,6 +210,12 @@ const UI = {
     // Trigger map resize when switching to map view
     if (view === 'map' && MapManager.map) {
       setTimeout(() => MapManager.map.invalidateSize(), 100);
+    }
+
+    // Floating controls: only on map view
+    const locateBtn = document.getElementById('locateBtn');
+    if (locateBtn) {
+      locateBtn.classList.toggle('hidden', view !== 'map');
     }
   },
 
@@ -695,57 +717,181 @@ const UI = {
         </div>
       `).join('');
 
-    // Drag and drop reordering (save on drop)
-    const items = Array.from(container.querySelectorAll('.waypoint-item'));
-    let draggingId = null;
-    let dropping = false;
+    // Drag & drop reordering (desktop) + touch reordering (mobile)
+    // Bind once per container; items are re-rendered often.
+    if (container.dataset.reorderBound !== '1') {
+      container.dataset.reorderBound = '1';
 
-    items.forEach((item) => {
-      item.addEventListener('dragstart', () => {
-        draggingId = item.dataset.id;
-        item.classList.add('dragging');
-      });
+      const state = {
+        draggingEl: null,
+        draggingId: null,
+        dropping: false,
+        lastOverEl: null,
+        touchActive: false,
+        touchId: null
+      };
 
-      item.addEventListener('dragenter', (e) => {
-        e.preventDefault();
-        item.classList.add('drag-over');
-      });
+      const clearOver = () => {
+        if (state.lastOverEl) {
+          state.lastOverEl.classList.remove('drop-before');
+          state.lastOverEl.classList.remove('drop-after');
+          state.lastOverEl = null;
+        }
+      };
 
-      item.addEventListener('dragover', (e) => {
-        e.preventDefault();
-      });
+      const getAfterElement = (y) => {
+        const items = Array.from(container.querySelectorAll('.waypoint-item:not(.dragging)'));
+        let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+        for (const child of items) {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            closest = { offset, element: child };
+          }
+        }
+        return closest.element;
+      };
 
-      item.addEventListener('dragleave', () => {
-        item.classList.remove('drag-over');
-      });
+      const getOrderIdsFromDom = () => Array.from(container.querySelectorAll('.waypoint-item')).map((el) => el.dataset.id);
 
-      item.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        item.classList.remove('drag-over');
-        if (!draggingId || dropping) return;
-        const targetId = item.dataset.id;
-        if (draggingId === targetId) return;
+      const persistCurrentOrder = async () => {
+        if (state.dropping) return;
+        const orderIds = getOrderIdsFromDom().filter(Boolean);
+        if (!orderIds.length) return;
 
-        const orderIds = items.map(el => el.dataset.id);
-        const fromIndex = orderIds.indexOf(draggingId);
-        const toIndex = orderIds.indexOf(targetId);
-        if (fromIndex === -1 || toIndex === -1) return;
-        const [moved] = orderIds.splice(fromIndex, 1);
-        orderIds.splice(toIndex, 0, moved);
-
-        dropping = true;
+        state.dropping = true;
         try {
           await App.reorderWaypoints(orderIds);
         } finally {
-          dropping = false;
+          state.dropping = false;
+        }
+      };
+
+      // Desktop HTML5 DnD
+      container.addEventListener('dragstart', (e) => {
+        const item = e.target?.closest?.('.waypoint-item');
+        if (!item) return;
+
+        state.draggingEl = item;
+        state.draggingId = item.dataset.id;
+        item.classList.add('dragging');
+
+        try {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', state.draggingId || '');
+        } catch (_) {
+          // ignore
         }
       });
 
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        draggingId = null;
+      container.addEventListener('dragover', (e) => {
+        if (!state.draggingEl) return;
+        e.preventDefault();
+        const afterEl = getAfterElement(e.clientY);
+        if (!afterEl) {
+          container.appendChild(state.draggingEl);
+        } else {
+          container.insertBefore(state.draggingEl, afterEl);
+        }
       });
-    });
+
+      container.addEventListener('dragenter', (e) => {
+        const overItem = e.target?.closest?.('.waypoint-item');
+        if (!state.draggingEl || !overItem || overItem === state.draggingEl) return;
+        e.preventDefault();
+        clearOver();
+        const box = overItem.getBoundingClientRect();
+        const isAfter = (e.clientY - box.top) > (box.height / 2);
+        overItem.classList.add(isAfter ? 'drop-after' : 'drop-before');
+        state.lastOverEl = overItem;
+      });
+
+      container.addEventListener('dragleave', (e) => {
+        const overItem = e.target?.closest?.('.waypoint-item');
+        if (!overItem) return;
+        overItem.classList.remove('drop-before');
+        overItem.classList.remove('drop-after');
+        if (state.lastOverEl === overItem) state.lastOverEl = null;
+      });
+
+      container.addEventListener('drop', async (e) => {
+        if (!state.draggingEl) return;
+        e.preventDefault();
+        clearOver();
+        await persistCurrentOrder();
+      });
+
+      container.addEventListener('dragend', () => {
+        clearOver();
+        if (state.draggingEl) state.draggingEl.classList.remove('dragging');
+        state.draggingEl = null;
+        state.draggingId = null;
+      });
+
+      // Touch reorder (mobile)
+      const findHandleItem = (target) => {
+        const handle = target?.closest?.('.waypoint-handle');
+        if (!handle) return null;
+        return handle.closest('.waypoint-item');
+      };
+
+      container.addEventListener('touchstart', (e) => {
+        const item = findHandleItem(e.target);
+        if (!item) return;
+        const touch = e.changedTouches?.[0];
+        if (!touch) return;
+
+        state.touchActive = true;
+        state.touchId = touch.identifier;
+        state.draggingEl = item;
+        state.draggingId = item.dataset.id;
+        item.classList.add('dragging');
+        container.classList.add('is-reordering');
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (!state.touchActive || !state.draggingEl) return;
+        const touch = Array.from(e.touches || []).find((t) => t.identifier === state.touchId);
+        if (!touch) return;
+
+        // Prevent scroll while actively reordering
+        e.preventDefault();
+
+        const elAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
+        const overItem = elAtPoint?.closest?.('.waypoint-item');
+        if (!overItem || overItem === state.draggingEl) {
+          clearOver();
+          return;
+        }
+
+        clearOver();
+        const box = overItem.getBoundingClientRect();
+        const isAfter = (touch.clientY - box.top) > (box.height / 2);
+        overItem.classList.add(isAfter ? 'drop-after' : 'drop-before');
+        state.lastOverEl = overItem;
+
+        if (isAfter) {
+          overItem.after(state.draggingEl);
+        } else {
+          overItem.before(state.draggingEl);
+        }
+      }, { passive: false });
+
+      const endTouch = async () => {
+        if (!state.touchActive) return;
+        state.touchActive = false;
+        state.touchId = null;
+        clearOver();
+        container.classList.remove('is-reordering');
+        if (state.draggingEl) state.draggingEl.classList.remove('dragging');
+        state.draggingEl = null;
+        state.draggingId = null;
+        await persistCurrentOrder();
+      };
+
+      container.addEventListener('touchend', endTouch, { passive: true });
+      container.addEventListener('touchcancel', endTouch, { passive: true });
+    }
   },
 
   /**
