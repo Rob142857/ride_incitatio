@@ -6,6 +6,8 @@ const UI = {
   toastTimeout: null,
   placeSearchBias: null,
   placeSearchResults: [],
+  authGateLastStatus: 'Signed out',
+  landingGateLastShown: false,
 
   /**
    * Initialize UI
@@ -19,9 +21,71 @@ const UI = {
     this.bindPullToRefresh();
     this.bindPlaceSearch();
     this.bindFullscreen();
+    this.bindAuthGate();
+    this.bindLandingGate();
     const attachmentList = document.getElementById('noteAttachmentList');
     if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
     return this;
+  },
+
+  bindAuthGate() {
+    const btn = document.getElementById('beginBtn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      // Single entrypoint: open sign-in window (provider selection modal)
+      this.hideAuthGate();
+      this.openModal('loginModal');
+    });
+  },
+
+  bindLandingGate() {
+    const btn = document.getElementById('landingBeginBtn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      try {
+        localStorage.setItem('ride_landing_seen', '1');
+      } catch (_) {}
+      this.hideLandingGate();
+      // Hand off into auth flow if needed.
+      try {
+        if (!App?.currentUser || !App?.useCloud) {
+          this.openModal('loginModal');
+        }
+      } catch (_) {
+        this.openModal('loginModal');
+      }
+    });
+  },
+
+  showLandingGate() {
+    const gate = document.getElementById('landingGate');
+    if (gate) {
+      this.landingGateLastShown = true;
+      gate.classList.remove('hidden');
+    }
+  },
+
+  hideLandingGate() {
+    const gate = document.getElementById('landingGate');
+    if (gate) gate.classList.add('hidden');
+  },
+
+  isLandingGateVisible() {
+    const gate = document.getElementById('landingGate');
+    return !!gate && !gate.classList.contains('hidden');
+  },
+
+  showAuthGate(statusText = 'Signed out') {
+    const gate = document.getElementById('authGate');
+    const status = document.getElementById('authGateStatus');
+    this.authGateLastStatus = statusText || 'Signed out';
+    if (status) status.textContent = statusText;
+    if (gate) gate.classList.remove('hidden');
+  },
+
+  hideAuthGate() {
+    const gate = document.getElementById('authGate');
+    if (gate) gate.classList.add('hidden');
   },
 
   bindRefreshButtons() {
@@ -239,6 +303,11 @@ const UI = {
   openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+      // Never allow the auth gate overlay to block login.
+      if (modalId === 'loginModal') {
+        this.hideAuthGate();
+        this.hideLandingGate();
+      }
       modal.classList.remove('hidden');
     }
   },
@@ -262,6 +331,17 @@ const UI = {
       if (modalId === 'noteModal') {
         const attachmentList = document.getElementById('noteAttachmentList');
         if (attachmentList) attachmentList.innerHTML = '<div class="microcopy">No attachments yet.</div>';
+      }
+
+      // If user dismisses login modal while still signed out, keep failing closed.
+      if (modalId === 'loginModal') {
+        try {
+          if (!App?.currentUser || !App?.useCloud) {
+            this.showAuthGate(this.authGateLastStatus || 'Signed out');
+          }
+        } catch (_) {
+          this.showAuthGate(this.authGateLastStatus || 'Signed out');
+        }
       }
     }
   },
@@ -461,7 +541,6 @@ const UI = {
     const waypoint = await App.addWaypoint({ name, address, lat, lng, type, notes });
     if (waypoint) {
       this.closeModal('waypointModal');
-      this.showToast('Waypoint added', 'success');
     }
   },
 
@@ -583,8 +662,15 @@ const UI = {
       return;
     }
 
-    container.innerHTML = waypoints
-      .sort((a, b) => a.order - b.order)
+    const orderedWaypoints = (Array.isArray(waypoints) ? waypoints : [])
+      .slice()
+      .sort((a, b) => {
+        const ao = Number.isFinite(a?.order) ? a.order : (Number.isFinite(a?.sort_order) ? a.sort_order : 0);
+        const bo = Number.isFinite(b?.order) ? b.order : (Number.isFinite(b?.sort_order) ? b.sort_order : 0);
+        return ao - bo;
+      });
+
+    container.innerHTML = orderedWaypoints
       .map((wp, index) => `
         <div class="waypoint-item" data-id="${wp.id}" draggable="true">
           <div class="waypoint-handle" title="Drag to reorder">
@@ -609,9 +695,10 @@ const UI = {
         </div>
       `).join('');
 
-    // Drag and drop reordering
+    // Drag and drop reordering (save on drop)
     const items = Array.from(container.querySelectorAll('.waypoint-item'));
     let draggingId = null;
+    let dropping = false;
 
     items.forEach((item) => {
       item.addEventListener('dragstart', () => {
@@ -632,10 +719,10 @@ const UI = {
         item.classList.remove('drag-over');
       });
 
-      item.addEventListener('drop', (e) => {
+      item.addEventListener('drop', async (e) => {
         e.preventDefault();
         item.classList.remove('drag-over');
-        if (!draggingId) return;
+        if (!draggingId || dropping) return;
         const targetId = item.dataset.id;
         if (draggingId === targetId) return;
 
@@ -646,7 +733,12 @@ const UI = {
         const [moved] = orderIds.splice(fromIndex, 1);
         orderIds.splice(toIndex, 0, moved);
 
-        App.reorderWaypoints(orderIds);
+        dropping = true;
+        try {
+          await App.reorderWaypoints(orderIds);
+        } finally {
+          dropping = false;
+        }
       });
 
       item.addEventListener('dragend', () => {

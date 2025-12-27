@@ -88,6 +88,129 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Auth gate overlay (signed out / connection lost) */
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-modal-overlay);
+}
+
+.auth-gate.hidden {
+  display: none;
+}
+
+.auth-gate-card {
+  width: min(420px, 100%);
+  background: var(--bg-modal);
+  border: 1px solid var(--border-elegant);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
+  padding: 26px 22px;
+  text-align: center;
+}
+
+.auth-gate-title {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.auth-gate-status {
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+}
+
+.auth-gate-card .primary-btn {
+  width: 100%;
+}
+
+/* First-visit landing overlay */
+.landing-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 3500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: var(--bg-modal-overlay);
+}
+
+.landing-gate.hidden {
+  display: none;
+}
+
+.landing-gate-shell {
+  width: min(520px, 100%);
+}
+
+.landing-gate-card {
+  background: rgba(18, 20, 31, 0.78);
+  border: 1px solid var(--border-elegant);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-modal);
+  padding: 28px 22px;
+  text-align: left;
+  backdrop-filter: blur(14px);
+}
+
+.landing-gate-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.landing-gate-title {
+  margin-top: 8px;
+  font-size: 2.2rem;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+
+.landing-gate-rule {
+  width: 62px;
+  height: 1px;
+  margin: 14px 0;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.landing-gate-blurb {
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+
+.landing-gate-quote {
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-btn);
+  padding: 14px 14px;
+  margin-bottom: 18px;
+}
+
+.landing-gate-quote-line {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 6px;
+}
+
+.landing-gate-quote-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.landing-gate-card .primary-btn {
+  width: 100%;
+}
+
 /* Elegant scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
@@ -935,7 +1058,7 @@ body.ride-mode .panel-title {
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   font-size: 0.9rem;
   font-weight: 700;
   text-decoration: none;
@@ -1405,7 +1528,7 @@ body.ride-mode .panel-title {
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   padding: 4px 10px;
 }
 
@@ -1727,7 +1850,7 @@ body.ride-mode .panel-title {
   appearance: none;
   width: 48px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   position: relative;
@@ -1743,7 +1866,7 @@ body.ride-mode .panel-title {
   left: 3px;
   width: 18px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: var(--radius-btn);
   background: var(--text-secondary);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: all 0.35s var(--ease-smooth);
@@ -1900,6 +2023,20 @@ body.ride-mode .panel-title {
 }
 
 /* Waypoint List Item */
+.waypoints-list.is-saving {
+  pointer-events: none;
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.waypoints-list.is-saving::before {
+  content: 'Saving…';
+  display: block;
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .waypoint-item {
   background: var(--bg-secondary);
   border-radius: 12px;
@@ -2217,7 +2354,7 @@ body.ride-mode .panel-title {
   gap: 10px;
   padding: 8px 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   background: rgba(255, 255, 255, 0.04);
   font-size: 12px;
   line-height: 1.3;

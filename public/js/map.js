@@ -164,7 +164,7 @@ const MapManager = {
 
         App.saveRouteData({
           distance: route.summary.totalDistance,
-          time: route.summary.totalTime,
+          duration: route.summary.totalTime,
           coordinates: route.coordinates,
           steps
         });
@@ -473,7 +473,7 @@ const MapManager = {
 
         App.saveRouteData({
           distance: route.summary.totalDistance,
-          time: route.summary.totalTime,
+          duration: route.summary.totalTime,
           coordinates: route.coordinates,
           steps
         });

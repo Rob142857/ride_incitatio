@@ -12,7 +12,7 @@ export const TripsHandler = {
   async listTrips(context) {
     const { env, user } = context;
     
-    const trips = await env.DB.prepare(
+    const trips = await env.RIDE_TRIP_PLANNER_DB.prepare(
       `SELECT t.*, 
         (SELECT COUNT(*) FROM waypoints WHERE trip_id = t.id) as waypoint_count,
         (SELECT COUNT(*) FROM journal_entries WHERE trip_id = t.id) as journal_count,
@@ -51,7 +51,7 @@ export const TripsHandler = {
     
     while (attempts < maxAttempts) {
       try {
-        await env.DB.prepare(
+        await env.RIDE_TRIP_PLANNER_DB.prepare(
           `INSERT INTO trips (id, user_id, name, description, settings, short_code) 
            VALUES (?, ?, ?, ?, ?, ?)`
         ).bind(id, user.id, body.name, body.description || '', settings, shortCode).run();
@@ -66,7 +66,7 @@ export const TripsHandler = {
       }
     }
     
-    const trip = await env.DB.prepare('SELECT * FROM trips WHERE id = ?').bind(id).first();
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM trips WHERE id = ?').bind(id).first();
     trip.short_url = `${BASE_URL}/${shortCode}`;
     
     return jsonResponse({ trip }, 201);
@@ -78,7 +78,7 @@ export const TripsHandler = {
   async getTrip(context) {
     const { env, user, params } = context;
     
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).first();
     
@@ -87,22 +87,22 @@ export const TripsHandler = {
     }
     
     // Get waypoints
-    const waypoints = await env.DB.prepare(
+    const waypoints = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM waypoints WHERE trip_id = ? ORDER BY sort_order'
     ).bind(params.id).all();
     
     // Get journal entries (all - owner can see private)
-    const journal = await env.DB.prepare(
+    const journal = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM journal_entries WHERE trip_id = ? ORDER BY created_at DESC'
     ).bind(params.id).all();
     
     // Get attachments (all - owner can see private)
-    const attachments = await env.DB.prepare(
+    const attachments = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM attachments WHERE trip_id = ? ORDER BY created_at DESC'
     ).bind(params.id).all();
     
     // Get route data
-    const routeData = await env.DB.prepare(
+    const routeData = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM route_data WHERE trip_id = ?'
     ).bind(params.id).first();
     
@@ -141,7 +141,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify ownership
-    const existing = await env.DB.prepare(
+    const existing = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).first();
     
@@ -190,14 +190,14 @@ export const TripsHandler = {
       updates.push('updated_at = datetime("now")');
       values.push(params.id);
       
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         `UPDATE trips SET ${updates.join(', ')} WHERE id = ?`
       ).bind(...values).run();
     }
     
     // Update route data if provided
     if (body.route) {
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         `INSERT OR REPLACE INTO route_data (id, trip_id, coordinates, distance, duration, updated_at)
          VALUES (?, ?, ?, ?, ?, datetime("now"))`
       ).bind(
@@ -209,7 +209,7 @@ export const TripsHandler = {
       ).run();
     }
     
-    const trip = await env.DB.prepare('SELECT * FROM trips WHERE id = ?').bind(params.id).first();
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM trips WHERE id = ?').bind(params.id).first();
     
     return jsonResponse({ trip });
   },
@@ -220,7 +220,7 @@ export const TripsHandler = {
   async deleteTrip(context) {
     const { env, user, params } = context;
     
-    const result = await env.DB.prepare(
+    const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).run();
     
@@ -239,7 +239,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -252,21 +252,21 @@ export const TripsHandler = {
     }
     
     // Get next sort order
-    const lastWp = await env.DB.prepare(
+    const lastWp = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT MAX(sort_order) as max_order FROM waypoints WHERE trip_id = ?'
     ).bind(params.tripId).first();
     
     const sortOrder = (lastWp?.max_order ?? -1) + 1;
     const id = generateId();
     
-    await env.DB.prepare(
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
       'INSERT INTO waypoints (id, trip_id, name, address, lat, lng, type, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(id, params.tripId, body.name, body.address || '', body.lat, body.lng, body.type || 'stop', body.notes || '', sortOrder).run();
     
     // Update trip timestamp
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     
-    const waypoint = await env.DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(id).first();
+    const waypoint = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(id).first();
     
     return jsonResponse({ waypoint }, 201);
   },
@@ -279,7 +279,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -299,14 +299,14 @@ export const TripsHandler = {
     
     if (updates.length > 0) {
       values.push(params.id, params.tripId);
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         `UPDATE waypoints SET ${updates.join(', ')} WHERE id = ? AND trip_id = ?`
       ).bind(...values).run();
       
-      await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     }
     
-    const waypoint = await env.DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(params.id).first();
+    const waypoint = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(params.id).first();
     
     return jsonResponse({ waypoint });
   },
@@ -318,7 +318,7 @@ export const TripsHandler = {
     const { env, user, params } = context;
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -326,11 +326,11 @@ export const TripsHandler = {
       return errorResponse('Trip not found', 404);
     }
     
-    await env.DB.prepare(
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM waypoints WHERE id = ? AND trip_id = ?'
     ).bind(params.id, params.tripId).run();
     
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     
     return jsonResponse({ success: true });
   },
@@ -347,7 +347,7 @@ export const TripsHandler = {
     }
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -357,12 +357,12 @@ export const TripsHandler = {
     
     // Update each waypoint's order
     for (let i = 0; i < body.order.length; i++) {
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         'UPDATE waypoints SET sort_order = ? WHERE id = ? AND trip_id = ?'
       ).bind(i, body.order[i], params.tripId).run();
     }
     
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     
     return jsonResponse({ success: true });
   },
@@ -375,7 +375,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -389,7 +389,7 @@ export const TripsHandler = {
     
     const id = generateId();
     
-    await env.DB.prepare(
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
       `INSERT INTO journal_entries (id, trip_id, waypoint_id, title, content, is_private, tags, location)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
@@ -403,9 +403,9 @@ export const TripsHandler = {
       body.location ? JSON.stringify(body.location) : null
     ).run();
     
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     
-    const entry = await env.DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(id).first();
+    const entry = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(id).first();
     
     return jsonResponse({
       entry: {
@@ -424,7 +424,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -445,14 +445,14 @@ export const TripsHandler = {
       updates.push('updated_at = datetime("now")');
       values.push(params.id, params.tripId);
       
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         `UPDATE journal_entries SET ${updates.join(', ')} WHERE id = ? AND trip_id = ?`
       ).bind(...values).run();
       
-      await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     }
     
-    const entry = await env.DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(params.id).first();
+    const entry = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(params.id).first();
     
     return jsonResponse({
       entry: {
@@ -470,7 +470,7 @@ export const TripsHandler = {
     const { env, user, params } = context;
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -478,11 +478,11 @@ export const TripsHandler = {
       return errorResponse('Trip not found', 404);
     }
     
-    await env.DB.prepare(
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM journal_entries WHERE id = ? AND trip_id = ?'
     ).bind(params.id, params.tripId).run();
     
-    await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
     
     return jsonResponse({ success: true });
   },
@@ -494,7 +494,7 @@ export const TripsHandler = {
     const { env, user, params } = context;
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).first();
     
@@ -508,7 +508,7 @@ export const TripsHandler = {
       let attempts = 0;
       while (attempts < 3) {
         try {
-          await env.DB.prepare(
+          await env.RIDE_TRIP_PLANNER_DB.prepare(
             'UPDATE trips SET short_code = ?, is_public = 1 WHERE id = ?'
           ).bind(shortCode, params.id).run();
           break;
@@ -523,7 +523,7 @@ export const TripsHandler = {
       }
     } else {
       // Just mark as public
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         'UPDATE trips SET is_public = 1 WHERE id = ?'
       ).bind(params.id).run();
     }
@@ -541,7 +541,7 @@ export const TripsHandler = {
     const { env, params } = context;
     
     // Look up by short code
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM trips WHERE short_code = ?'
     ).bind(params.shortCode).first();
     
@@ -554,22 +554,22 @@ export const TripsHandler = {
     }
     
     // Get waypoints
-    const waypoints = await env.DB.prepare(
+    const waypoints = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, name, lat, lng, type, sort_order FROM waypoints WHERE trip_id = ? ORDER BY sort_order'
     ).bind(trip.id).all();
     
     // Get PUBLIC journal entries only (is_private = 0)
-    const journal = await env.DB.prepare(
+    const journal = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, title, content, tags, created_at FROM journal_entries WHERE trip_id = ? AND is_private = 0 ORDER BY created_at DESC'
     ).bind(trip.id).all();
     
     // Get PUBLIC attachments only (is_private = 0)
-    const attachments = await env.DB.prepare(
+    const attachments = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, filename, original_name, mime_type, caption, is_cover FROM attachments WHERE trip_id = ? AND is_private = 0 ORDER BY is_cover DESC, created_at DESC'
     ).bind(trip.id).all();
     
     // Get route data
-    const routeData = await env.DB.prepare(
+    const routeData = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM route_data WHERE trip_id = ?'
     ).bind(trip.id).first();
     
@@ -624,7 +624,7 @@ export const TripsHandler = {
     const { env, user, params, request } = context;
     
     // Verify trip ownership
-    const trip = await env.DB.prepare(
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
@@ -653,7 +653,7 @@ export const TripsHandler = {
 
     // Validate scoped relations belong to this trip and user
     if (journalEntryId) {
-      const journal = await env.DB.prepare(
+      const journal = await env.RIDE_TRIP_PLANNER_DB.prepare(
         'SELECT je.id FROM journal_entries je JOIN trips t ON je.trip_id = t.id WHERE je.id = ? AND je.trip_id = ? AND t.user_id = ?'
       ).bind(journalEntryId, params.tripId, user.id).first();
       if (!journal) {
@@ -662,7 +662,7 @@ export const TripsHandler = {
     }
 
     if (waypointId) {
-      const waypoint = await env.DB.prepare(
+      const waypoint = await env.RIDE_TRIP_PLANNER_DB.prepare(
         'SELECT w.id FROM waypoints w JOIN trips t ON w.trip_id = t.id WHERE w.id = ? AND w.trip_id = ? AND t.user_id = ?'
       ).bind(waypointId, params.tripId, user.id).first();
       if (!waypoint) {
@@ -673,7 +673,7 @@ export const TripsHandler = {
     // Upload to R2 then insert DB; cleanup R2 on DB failure
     let objectPutSucceeded = false;
     try {
-      await env.ATTACHMENTS.put(storageKey, file.stream(), {
+      await env.RIDE_TRIP_PLANNER_ATTACHMENTS.put(storageKey, file.stream(), {
         httpMetadata: {
           contentType: file.type
         },
@@ -686,13 +686,13 @@ export const TripsHandler = {
     
     // If setting as cover, unset other covers
     if (isCover) {
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         'UPDATE attachments SET is_cover = 0 WHERE trip_id = ?'
       ).bind(params.tripId).run();
     }
     
       // Insert attachment record
-      await env.DB.prepare(
+      await env.RIDE_TRIP_PLANNER_DB.prepare(
         `INSERT INTO attachments (id, trip_id, journal_entry_id, waypoint_id, filename, original_name, mime_type, size_bytes, storage_key, is_private, is_cover, caption)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
@@ -712,14 +712,14 @@ export const TripsHandler = {
     
       // Update cover_image_url on trip if this is the cover
       if (isCover) {
-        await env.DB.prepare(
+        await env.RIDE_TRIP_PLANNER_DB.prepare(
           'UPDATE trips SET cover_image_url = ? WHERE id = ?'
         ).bind(`${BASE_URL}/api/attachments/${id}`, params.tripId).run();
       }
     
-      await env.DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
 
-      const attachment = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(id).first();
+      const attachment = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(id).first();
 
       return jsonResponse({
         attachment: {
@@ -729,7 +729,7 @@ export const TripsHandler = {
       }, 201);
     } catch (err) {
       if (objectPutSucceeded) {
-        try { await env.ATTACHMENTS.delete(storageKey); } catch (_) {}
+        try { await env.RIDE_TRIP_PLANNER_ATTACHMENTS.delete(storageKey); } catch (_) {}
       }
       throw err;
     }
@@ -741,7 +741,7 @@ export const TripsHandler = {
   async getAttachment(context) {
     const { env, params, user } = context;
     
-    const attachment = await env.DB.prepare(
+    const attachment = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT a.*, t.user_id, t.is_public as trip_is_public FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE a.id = ?'
     ).bind(params.id).first();
     
@@ -758,7 +758,7 @@ export const TripsHandler = {
     }
     
     // Fetch from R2
-    const object = await env.ATTACHMENTS.get(attachment.storage_key);
+    const object = await env.RIDE_TRIP_PLANNER_ATTACHMENTS.get(attachment.storage_key);
     
     if (!object) {
       return errorResponse('File not found', 404);
@@ -787,7 +787,7 @@ export const TripsHandler = {
     const body = await parseBody(request);
     
     // Verify ownership through trip
-    const attachment = await env.DB.prepare(
+    const attachment = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT a.*, t.user_id FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE a.id = ?'
     ).bind(params.id).first();
     
@@ -809,30 +809,30 @@ export const TripsHandler = {
     if (body.is_cover !== undefined) {
       if (body.is_cover) {
         // Unset other covers first
-        await env.DB.prepare('UPDATE attachments SET is_cover = 0 WHERE trip_id = ?').bind(attachment.trip_id).run();
-        await env.DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${params.id}`, attachment.trip_id).run();
+        await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE attachments SET is_cover = 0 WHERE trip_id = ?').bind(attachment.trip_id).run();
+        await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${params.id}`, attachment.trip_id).run();
       }
       updates.push('is_cover = ?');
       values.push(body.is_cover ? 1 : 0);
       if (!body.is_cover) {
         // If unsetting cover, clear or recompute cover_image_url
-        const fallback = await env.DB.prepare(
+        const fallback = await env.RIDE_TRIP_PLANNER_DB.prepare(
           'SELECT id FROM attachments WHERE trip_id = ? AND is_cover = 1 AND id != ? ORDER BY created_at DESC'
         ).bind(attachment.trip_id, params.id).first();
         if (fallback) {
-          await env.DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
+          await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
         } else {
-          await env.DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
+          await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
         }
       }
     }
     
     if (updates.length > 0) {
       values.push(params.id);
-      await env.DB.prepare(`UPDATE attachments SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
+      await env.RIDE_TRIP_PLANNER_DB.prepare(`UPDATE attachments SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
     }
     
-    const updated = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(params.id).first();
+    const updated = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(params.id).first();
     
     return jsonResponse({
       attachment: {
@@ -849,7 +849,7 @@ export const TripsHandler = {
     const { env, user, params } = context;
     
     // Verify ownership through trip
-    const attachment = await env.DB.prepare(
+    const attachment = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT a.*, t.user_id FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE a.id = ?'
     ).bind(params.id).first();
     
@@ -858,20 +858,20 @@ export const TripsHandler = {
     }
     
     // Delete from R2
-    await env.ATTACHMENTS.delete(attachment.storage_key);
+    await env.RIDE_TRIP_PLANNER_ATTACHMENTS.delete(attachment.storage_key);
     
     // Delete from DB
-    await env.DB.prepare('DELETE FROM attachments WHERE id = ?').bind(params.id).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('DELETE FROM attachments WHERE id = ?').bind(params.id).run();
 
     // If the deleted attachment was the cover, recompute cover_image_url
     if (attachment.is_cover) {
-      const fallback = await env.DB.prepare(
+      const fallback = await env.RIDE_TRIP_PLANNER_DB.prepare(
         'SELECT id FROM attachments WHERE trip_id = ? AND is_cover = 1 ORDER BY created_at DESC'
       ).bind(attachment.trip_id).first();
       if (fallback) {
-        await env.DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
+        await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET cover_image_url = ? WHERE id = ?').bind(`${BASE_URL}/api/attachments/${fallback.id}`, attachment.trip_id).run();
       } else {
-        await env.DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
+        await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET cover_image_url = NULL WHERE id = ?').bind(attachment.trip_id).run();
       }
     }
     
@@ -886,21 +886,21 @@ export const TripsHandler = {
     const { env, user } = context;
 
     // Collect attachment storage keys for this user's trips
-    const attachments = await env.DB.prepare(
+    const attachments = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT a.storage_key FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE t.user_id = ?'
     ).bind(user.id).all();
 
     // Best-effort R2 cleanup; continue even if some objects are missing
     for (const row of attachments.results || []) {
       try {
-        await env.ATTACHMENTS.delete(row.storage_key);
+        await env.RIDE_TRIP_PLANNER_ATTACHMENTS.delete(row.storage_key);
       } catch (err) {
         console.error('R2 delete failed', row.storage_key, err);
       }
     }
 
     // Remove all trips (cascades to waypoints, journal, attachments, route_data, short_urls)
-    await env.DB.prepare('DELETE FROM trips WHERE user_id = ?').bind(user.id).run();
+    await env.RIDE_TRIP_PLANNER_DB.prepare('DELETE FROM trips WHERE user_id = ?').bind(user.id).run();
 
     return jsonResponse({ success: true, deleted_objects: attachments.results?.length || 0 });
   }

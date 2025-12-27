@@ -50,6 +50,27 @@ const API = {
       }
 
       if (!response.ok) {
+        // Centralize auth-expired handling so UI can fail-closed.
+        if (response.status === 401 && typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('ride:auth-expired', {
+              detail: { endpoint, status: response.status }
+            }));
+          } catch (_) {
+            // ignore
+          }
+        }
+
+        // Treat server-side failures as a lost connection (fail closed).
+        if (response.status >= 500 && typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('ride:connection-lost', {
+              detail: { endpoint, status: response.status, kind: 'server' }
+            }));
+          } catch (_) {
+            // ignore
+          }
+        }
         const err = new Error(data.error || data.message || `Request failed (${response.status})`);
         err.status = response.status;
         err.body = data;
@@ -63,6 +84,16 @@ const API = {
       if (!error.status) {
         error.status = 0;
         error.message = error.message || 'Network error';
+      }
+
+      if (error.status === 0 && typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('ride:connection-lost', {
+            detail: { endpoint, status: 0, kind: 'network' }
+          }));
+        } catch (_) {
+          // ignore
+        }
       }
       throw error;
     }
@@ -192,26 +223,59 @@ const API = {
       formData.append('file', file);
       formData.append('is_cover', options.is_cover ? 'true' : 'false');
 
-      const data = await fetch(`${API.baseUrl}/trips/${tripId}/attachments`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      }).then(async (res) => {
-        let body;
-        try {
-          body = await res.json();
-        } catch (_) {
-          const text = await res.text();
-          body = text ? { error: text } : {};
+      let data;
+      try {
+        data = await fetch(`${API.baseUrl}/trips/${tripId}/attachments`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        }).then(async (res) => {
+          let body;
+          try {
+            body = await res.json();
+          } catch (_) {
+            const text = await res.text();
+            body = text ? { error: text } : {};
+          }
+
+          if (!res.ok) {
+            if (res.status === 401 && typeof window !== 'undefined') {
+              try {
+                window.dispatchEvent(new CustomEvent('ride:auth-expired', {
+                  detail: { endpoint: `/trips/${tripId}/attachments`, status: res.status }
+                }));
+              } catch (_) {}
+            }
+
+            if (res.status >= 500 && typeof window !== 'undefined') {
+              try {
+                window.dispatchEvent(new CustomEvent('ride:connection-lost', {
+                  detail: { endpoint: `/trips/${tripId}/attachments`, status: res.status, kind: 'server' }
+                }));
+              } catch (_) {}
+            }
+
+            const err = new Error(body.error || `Upload failed (${res.status})`);
+            err.status = res.status;
+            err.body = body;
+            throw err;
+          }
+
+          return body;
+        });
+      } catch (err) {
+        if (!err.status) {
+          err.status = 0;
         }
-        if (!res.ok) {
-          const err = new Error(body.error || `Upload failed (${res.status})`);
-          err.status = res.status;
-          err.body = body;
-          throw err;
+        if (err.status === 0 && typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('ride:connection-lost', {
+              detail: { endpoint: `/trips/${tripId}/attachments`, status: 0, kind: 'network' }
+            }));
+          } catch (_) {}
         }
-        return body;
-      });
+        throw err;
+      }
 
       return data.attachment;
     },

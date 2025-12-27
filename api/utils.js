@@ -125,14 +125,14 @@ export async function requireAuth(context) {
   
   // Verify token from KV store
   try {
-    const sessionData = await env.SESSIONS.get(token, 'json');
+    const sessionData = await env.RIDE_TRIP_PLANNER_SESSIONS.get(token, 'json');
     if (!sessionData) {
       return errorResponse('Session expired', 401);
     }
     
     // Check expiry
     if (sessionData.expiresAt && Date.now() > sessionData.expiresAt) {
-      await env.SESSIONS.delete(token);
+      await env.RIDE_TRIP_PLANNER_SESSIONS.delete(token);
       return errorResponse('Session expired', 401);
     }
     
@@ -173,7 +173,7 @@ export async function optionalAuth(context) {
   }
   
   try {
-    const sessionData = await env.SESSIONS.get(token, 'json');
+    const sessionData = await env.RIDE_TRIP_PLANNER_SESSIONS.get(token, 'json');
     if (sessionData && (!sessionData.expiresAt || Date.now() <= sessionData.expiresAt)) {
       context.user = sessionData.user;
     } else {
@@ -193,7 +193,7 @@ export async function createSession(env, user) {
   const token = generateId() + generateId(); // Longer token
   const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
   
-  await env.SESSIONS.put(token, JSON.stringify({
+  await env.RIDE_TRIP_PLANNER_SESSIONS.put(token, JSON.stringify({
     user,
     expiresAt
   }), {

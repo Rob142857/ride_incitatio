@@ -16,6 +16,8 @@ const App = {
   loginPromptShown: false,
   tripDetailId: null,
   tripListCache: [],
+  waypointSaveToastAt: 0,
+  isReorderingWaypoints: false,
 
   /**
    * Initialize the application
@@ -44,6 +46,11 @@ const App = {
     await this.checkAuth();
     // Always clear any stale local caches once auth is known; we only trust server trips now
     Storage.clearTrips();
+
+    // Fail-closed on auth expiry from any API call
+    window.addEventListener('ride:auth-expired', () => this.handleAuthExpired());
+    window.addEventListener('ride:connection-lost', (e) => this.handleConnectionLost(e?.detail));
+
     this.configureLoginLinks();
     if (!this.isSharedView) {
       this.showLoginPromptIfNeeded();
@@ -79,15 +86,26 @@ const App = {
     try {
       const user = await API.auth.getUser();
       if (user) {
+        // Prevent cross-account local state leaks (e.g., trip ordering) when a different user logs in.
+        const lastUserId = localStorage.getItem('ride_last_user_id');
+        if (lastUserId && lastUserId !== user.id) {
+          Storage.clearTrips();
+          Storage.setTripOrder([]);
+        }
+        localStorage.setItem('ride_last_user_id', user.id);
+
         this.currentUser = user;
         this.useCloud = true;
         this.updateUserUI();
+        UI.hideAuthGate();
         UI.closeModal('loginModal');
         return true;
       }
       // No session present (401)
+      localStorage.removeItem('ride_last_user_id');
       this.currentUser = null;
       this.useCloud = false;
+      UI.showAuthGate('Signed out');
       return false;
     } catch (error) {
       console.error('Auth check failed', error);
@@ -96,10 +114,73 @@ const App = {
         : 'Auth check failed. Working offline until re-auth.';
       UI.showToast(msg, 'info');
       // Reset user so UI reflects logged-out state on auth errors
+      localStorage.removeItem('ride_last_user_id');
       this.currentUser = null;
       this.useCloud = false;
+      UI.showAuthGate('Signed out');
       // Preserve existing useCloud flag so we can retry when online/focused
       return false;
+    }
+  },
+
+  handleAuthExpired() {
+    // If we already consider ourselves logged out, nothing else to do.
+    if (!this.currentUser && !this.useCloud) return;
+
+    this.currentUser = null;
+    this.useCloud = false;
+    localStorage.removeItem('ride_last_user_id');
+    this.updateUserUI();
+
+    // Clear any in-memory trip state to avoid edits that cannot be saved.
+    this.currentTrip = null;
+    this.tripListCache = [];
+    MapManager.clear();
+    UI.renderTrips([], null);
+    UI.renderWaypoints([]);
+    UI.renderJournal([]);
+    UI.updateTripTitle('');
+    UI.updateTripStats(null);
+
+    UI.showToast('Session expired. Please sign in again.', 'error');
+    if (!this.isSharedView) {
+      UI.closeModal('loginModal');
+      UI.showAuthGate('Signed out — session expired');
+    }
+  },
+
+  handleConnectionLost(detail) {
+    // Always fail closed: treat connection loss like a sign-out.
+    if (!this.currentUser && !this.useCloud) {
+      if (!this.isSharedView) {
+        UI.showAuthGate('Signed out');
+      }
+      return;
+    }
+
+    this.currentUser = null;
+    this.useCloud = false;
+    localStorage.removeItem('ride_last_user_id');
+    this.updateUserUI();
+
+    this.currentTrip = null;
+    this.tripListCache = [];
+    MapManager.clear();
+    UI.renderTrips([], null);
+    UI.renderWaypoints([]);
+    UI.renderJournal([]);
+    UI.updateTripTitle('');
+    UI.updateTripStats(null);
+
+    const kind = detail?.kind;
+    const msg = kind === 'network'
+      ? 'Signed out — connection lost.'
+      : 'Signed out — server unavailable.';
+    UI.showToast(msg, 'error');
+
+    if (!this.isSharedView) {
+      UI.closeModal('loginModal');
+      UI.showAuthGate(kind === 'network' ? 'Signed out — connection lost' : 'Signed out — server unavailable');
     }
   },
 
@@ -134,7 +215,7 @@ const App = {
    */
   showLoginPromptIfNeeded() {
     if (!this.currentUser && !this.loginPromptShown) {
-      UI.openModal('loginModal');
+      UI.showAuthGate('Signed out');
       this.loginPromptShown = true;
     }
   },
@@ -149,7 +230,7 @@ const App = {
       if (this.currentUser) {
         this.showUserDropdown();
       } else {
-        UI.openModal('loginModal');
+        UI.showAuthGate('Signed out');
       }
     });
   },
@@ -734,7 +815,7 @@ const App = {
   ensureEditable(action = 'make changes') {
     if (!this.currentUser || !this.useCloud) {
       UI.showToast(`Sign in to ${action}.`, 'error');
-      UI.openModal('loginModal');
+      UI.showAuthGate('Signed out');
       return false;
     }
     if (!this.isOnline) {
@@ -742,6 +823,15 @@ const App = {
       return false;
     }
     return true;
+  },
+
+  setWaypointsSaving(isSaving) {
+    const list = document.getElementById('waypointsList');
+    if (!list) return;
+    list.classList.toggle('is-saving', !!isSaving);
+    list.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+    // Align with CSS selector without relying on IDs in CSS.
+    list.classList.add('waypoints-list');
   },
 
   /**
@@ -798,6 +888,20 @@ const App = {
     if (normalized.waypoints) {
       normalized.waypoints = Trip.normalizeWaypointOrder(normalized.waypoints);
     }
+
+    // Normalize route shape across client/server:
+    // - server uses {distance, duration, coordinates}
+    // - client route builders historically used {distance, time, coordinates}
+    if (normalized.route) {
+      const duration = normalized.route.duration ?? normalized.route.time ?? null;
+      normalized.route = {
+        ...normalized.route,
+        duration,
+        time: duration,
+        coordinates: normalized.route.coordinates || []
+      };
+    }
+
     if (!Number.isFinite(normalized.cover_focus_x)) normalized.cover_focus_x = 50;
     if (!Number.isFinite(normalized.cover_focus_y)) normalized.cover_focus_y = 50;
     return normalized;
@@ -1019,6 +1123,7 @@ const App = {
     if (trip.waypoints) {
       trip.waypoints = Trip.normalizeWaypointOrder(trip.waypoints);
     }
+    trip = this.normalizeTrip(trip);
     this.attachJournalAttachments(trip);
     this.currentTrip = trip;
     
@@ -1130,15 +1235,25 @@ const App = {
     
     if (this.useCloud && this.currentUser) {
       try {
+        const route = this.currentTrip.route
+          ? {
+              coordinates: this.currentTrip.route.coordinates || [],
+              distance: this.currentTrip.route.distance ?? null,
+              duration: this.currentTrip.route.duration ?? this.currentTrip.route.time ?? null,
+              steps: this.currentTrip.route.steps || []
+            }
+          : null;
+
         await API.trips.update(this.currentTrip.id, {
           name: this.currentTrip.name,
           description: this.currentTrip.description,
           settings: this.currentTrip.settings,
-          route: this.currentTrip.route,
+          route,
           cover_image_url: this.currentTrip.cover_image_url,
           cover_focus_x: this.currentTrip.cover_focus_x,
           cover_focus_y: this.currentTrip.cover_focus_y
         });
+        return true;
       } catch (error) {
         console.error('Failed to save to cloud:', error);
         if (error.status === 404) {
@@ -1148,8 +1263,11 @@ const App = {
         } else {
           UI.showToast('Save failed. Not saved to cloud.', 'error');
         }
+        return false;
       }
     }
+
+    return false;
   },
 
   /**
@@ -1174,6 +1292,10 @@ const App = {
     // Update UI and map
     UI.renderWaypoints(this.currentTrip.waypoints);
     MapManager.addWaypointMarker(waypoint);
+
+    // Keep trips list counts fresh so users can see the save landed.
+    await this.refreshTripsList();
+    UI.showToast('Waypoint saved', 'success');
     
     // Update route
     if (this.currentTrip.waypoints.length >= 2) {
@@ -1199,7 +1321,13 @@ const App = {
     }
     
     Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
-    this.saveCurrentTrip();
+    await this.saveCurrentTrip();
+
+    const now = Date.now();
+    if (now - (this.waypointSaveToastAt || 0) > 2500) {
+      this.waypointSaveToastAt = now;
+      UI.showToast('Waypoint saved', 'success');
+    }
     
     // Update route
     if (this.currentTrip.waypoints.length >= 2) {
@@ -1207,6 +1335,7 @@ const App = {
     }
     
     UI.renderWaypoints(this.currentTrip.waypoints);
+    await this.refreshTripsList();
   },
 
   /**
@@ -1236,6 +1365,7 @@ const App = {
     }
     
     UI.showToast('Waypoint deleted', 'success');
+    await this.refreshTripsList();
   },
 
   /**
@@ -1245,23 +1375,33 @@ const App = {
     if (!this.currentTrip) return;
     if (!this.ensureEditable('reorder waypoints')) return;
 
-    // Update local order
-    Trip.reorderWaypoints(this.currentTrip, orderIds);
+    if (this.isReorderingWaypoints) return;
+    this.isReorderingWaypoints = true;
 
-    // Persist
+    this.setWaypointsSaving(true);
+
     try {
+      // Update local order
+      Trip.reorderWaypoints(this.currentTrip, orderIds);
+
+      // Persist
       await API.waypoints.reorder(this.currentTrip.id, orderIds);
+
+      await this.saveCurrentTrip();
+
+      // Refresh UI and map
+      UI.renderWaypoints(this.currentTrip.waypoints);
+      MapManager.updateWaypoints(this.currentTrip.waypoints);
+
+      await this.refreshTripsList();
+      UI.showToast('Waypoint order saved', 'success');
     } catch (error) {
       console.error('Failed to reorder waypoints in cloud:', error);
       UI.showToast('Reorder failed. Not saved to cloud.', 'error');
-      return;
+    } finally {
+      this.setWaypointsSaving(false);
+      this.isReorderingWaypoints = false;
     }
-
-    this.saveCurrentTrip();
-
-    // Refresh UI and map
-    UI.renderWaypoints(this.currentTrip.waypoints);
-    MapManager.updateWaypoints(this.currentTrip.waypoints);
   },
 
   /**
@@ -1406,11 +1546,17 @@ const App = {
   /**
    * Save route data from routing control
    */
-  saveRouteData(routeData) {
+  async saveRouteData(routeData) {
     if (!this.currentTrip) return;
     if (!this.ensureEditable('save routes')) return;
-    
-    this.currentTrip.route = routeData;
+
+    const duration = routeData?.duration ?? routeData?.time ?? null;
+    this.currentTrip.route = {
+      ...routeData,
+      duration,
+      time: duration,
+      coordinates: routeData?.coordinates || []
+    };
     this.precomputeRouteMetrics();
     this.prefetchTiles();
     this.rideRerouting = false;
@@ -1425,7 +1571,14 @@ const App = {
     }
     
     UI.updateTripStats(this.currentTrip);
-    this.saveCurrentTrip();
+
+    const ok = await this.saveCurrentTrip();
+    if (ok) {
+      UI.showToast('New route saved', 'success');
+      await this.refreshTripsList();
+    } else {
+      UI.showToast('Route not saved', 'error');
+    }
   },
 
   /**

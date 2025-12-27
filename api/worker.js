@@ -88,7 +88,7 @@ export default {
       // Verify this short code exists in DB before serving the page
       // This prevents serving trip.html for random 6-char paths
       try {
-        const trip = await env.DB.prepare(
+        const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
           'SELECT id FROM trips WHERE short_code = ? AND is_public = 1'
         ).bind(shortCode).first();
         

@@ -76,7 +76,7 @@ export const AuthHandler = {
     const state = generateId();
     
     // Store state in KV temporarily (5 minutes)
-    await env.SESSIONS.put(`oauth_state_${state}`, JSON.stringify({
+    await env.RIDE_TRIP_PLANNER_SESSIONS.put(`oauth_state_${state}`, JSON.stringify({
       provider: providerName,
       returnUrl: url.searchParams.get('return') || '/'
     }), { expirationTtl: 300 });
@@ -130,11 +130,11 @@ export const AuthHandler = {
     }
     
     // Verify state from KV
-    const stateData = await env.SESSIONS.get(`oauth_state_${state}`, 'json');
+    const stateData = await env.RIDE_TRIP_PLANNER_SESSIONS.get(`oauth_state_${state}`, 'json');
     if (!stateData || stateData.provider !== providerName) {
       return errorResponse('Invalid state', 400);
     }
-    await env.SESSIONS.delete(`oauth_state_${state}`);
+    await env.RIDE_TRIP_PLANNER_SESSIONS.delete(`oauth_state_${state}`);
     
     // Exchange code for token
     const redirectUri = `${url.origin}/api/auth/callback/${providerName}`;
@@ -186,7 +186,7 @@ export const AuthHandler = {
     const normalizedEmail = parsedUser.email.toLowerCase();
     
     // Create or update user in D1
-    const user = await createOrUpdateUser(env.DB, {
+    const user = await createOrUpdateUser(env.RIDE_TRIP_PLANNER_DB, {
       ...parsedUser,
       email: normalizedEmail,
       provider: providerName
@@ -231,7 +231,7 @@ export const AuthHandler = {
     
     if (match) {
       // Delete session from KV
-      await env.SESSIONS.delete(match[1]);
+      await env.RIDE_TRIP_PLANNER_SESSIONS.delete(match[1]);
     }
     
     const response = jsonResponse({ success: true });
@@ -252,7 +252,7 @@ export const AuthHandler = {
       }
     }
 
-    const result = await env.DB.prepare(
+    const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, email, name, provider, provider_id, created_at, updated_at, last_login FROM users ORDER BY created_at DESC'
     ).all();
 
@@ -272,7 +272,7 @@ export const AuthHandler = {
       }
     }
 
-    const result = await env.DB.prepare(
+    const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, user_id, email, provider, ip, user_agent, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'
     ).all();
 
@@ -287,9 +287,25 @@ async function recordLogin(env, user, provider, request) {
   const userAgent = request.headers.get('user-agent') || '';
   const id = generateId();
 
-  await env.DB.prepare(
-    'INSERT INTO login_events (id, user_id, email, provider, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(id, user.id, user.email, provider, ip, userAgent).run();
+  const clientHints = {
+    ua: request.headers.get('sec-ch-ua') || undefined,
+    uaPlatform: request.headers.get('sec-ch-ua-platform') || undefined,
+    uaMobile: request.headers.get('sec-ch-ua-mobile') || undefined,
+    acceptLanguage: request.headers.get('accept-language') || undefined,
+    cfRay: request.headers.get('cf-ray') || undefined,
+    cfCountry: request.headers.get('cf-ipcountry') || undefined
+  };
+
+  // Backward compatible: if extra columns don't exist yet, fall back to the base insert.
+  try {
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
+      'INSERT INTO login_events (id, user_id, email, provider, provider_id, ip, user_agent, client_hints) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(id, user.id, user.email, provider, user.provider_id || null, ip, userAgent, JSON.stringify(clientHints)).run();
+  } catch (err) {
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
+      'INSERT INTO login_events (id, user_id, email, provider, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(id, user.id, user.email, provider, ip, userAgent).run();
+  }
 }
 
 /**
@@ -299,35 +315,86 @@ async function createOrUpdateUser(db, userData) {
   const { email, name, avatar_url, provider, provider_id } = userData;
   const normalizedEmail = email?.toLowerCase();
 
-  // First try provider+id match
-  const existingByProvider = await db.prepare(
-    'SELECT * FROM users WHERE provider = ? AND provider_id = ?'
-  ).bind(provider, provider_id).first();
+  // Prefer the linked identities table if present.
+  try {
+    const existingIdentity = await db.prepare(
+      'SELECT u.* FROM auth_identities ai JOIN users u ON ai.user_id = u.id WHERE ai.provider = ? AND ai.provider_id = ?'
+    ).bind(provider, provider_id).first();
 
-  if (existingByProvider) {
+    if (existingIdentity) {
+      await db.prepare(
+        'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+      ).bind(normalizedEmail, name, avatar_url, existingIdentity.id).run();
+
+      await db.prepare(
+        'UPDATE auth_identities SET email = ?, last_login = datetime("now") WHERE provider = ? AND provider_id = ?'
+      ).bind(normalizedEmail, provider, provider_id).run();
+
+      return { ...existingIdentity, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+    }
+
+    const existingUser = await db.prepare('SELECT * FROM users WHERE email = ?').bind(normalizedEmail).first();
+    if (existingUser) {
+      // Link this provider identity to the existing user (one user per email).
+      try {
+        await db.prepare(
+          'INSERT INTO auth_identities (id, user_id, provider, provider_id, email, created_at, last_login) VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))'
+        ).bind(generateId(), existingUser.id, provider, provider_id, normalizedEmail).run();
+      } catch (_) {
+        // Ignore if a concurrent login already inserted it.
+      }
+
+      await db.prepare(
+        'UPDATE users SET name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+      ).bind(name, avatar_url, existingUser.id).run();
+
+      return { ...existingUser, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+    }
+
+    // Create new user + first linked identity.
+    const id = generateId();
     await db.prepare(
-      'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
-    ).bind(normalizedEmail, name, avatar_url, existingByProvider.id).run();
-    return { ...existingByProvider, email: normalizedEmail, name, avatar_url, last_login: new Date().toISOString() };
-  }
+      'INSERT INTO users (id, email, name, avatar_url, provider, provider_id, last_login) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(id, normalizedEmail, name, avatar_url, provider, provider_id).run();
 
-  // Then try email match to merge accounts across providers
-  const existingByEmail = await db.prepare(
-    'SELECT * FROM users WHERE email = ?'
-  ).bind(normalizedEmail).first();
-
-  if (existingByEmail) {
     await db.prepare(
-      'UPDATE users SET provider = ?, provider_id = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
-    ).bind(provider, provider_id, name, avatar_url, existingByEmail.id).run();
-    return { ...existingByEmail, provider, provider_id, name, avatar_url, last_login: new Date().toISOString() };
-  }
+      'INSERT INTO auth_identities (id, user_id, provider, provider_id, email, created_at, last_login) VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))'
+    ).bind(generateId(), id, provider, provider_id, normalizedEmail).run();
 
-  // Create new user
-  const id = generateId();
-  await db.prepare(
-    'INSERT INTO users (id, email, name, avatar_url, provider, provider_id, last_login) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
-  ).bind(id, normalizedEmail, name, avatar_url, provider, provider_id).run();
-  
-  return { id, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+    return { id, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+  } catch (err) {
+    // Legacy fallback (no auth_identities table yet): keep one account per email by reusing existing user.
+
+    // First try provider+id match
+    const existingByProvider = await db.prepare(
+      'SELECT * FROM users WHERE provider = ? AND provider_id = ?'
+    ).bind(provider, provider_id).first();
+
+    if (existingByProvider) {
+      await db.prepare(
+        'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+      ).bind(normalizedEmail, name, avatar_url, existingByProvider.id).run();
+      return { ...existingByProvider, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+    }
+
+    // Then try email match to merge accounts across providers
+    const existingByEmail = await db.prepare('SELECT * FROM users WHERE email = ?').bind(normalizedEmail).first();
+
+    if (existingByEmail) {
+      // IMPORTANT: do not create a second user for the same email.
+      // In legacy mode we cannot persist multiple identities, so we keep the existing user record.
+      await db.prepare(
+        'UPDATE users SET name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+      ).bind(name, avatar_url, existingByEmail.id).run();
+      return { ...existingByEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+    }
+
+    // Create new user
+    const id = generateId();
+    await db.prepare(
+      'INSERT INTO users (id, email, name, avatar_url, provider, provider_id, last_login) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(id, normalizedEmail, name, avatar_url, provider, provider_id).run();
+
+    return { id, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+  }
 }

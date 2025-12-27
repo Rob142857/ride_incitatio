@@ -10,18 +10,18 @@ binding = "ASSETS"
 
 # D1 Database binding
 [[d1_databases]]
-binding = "DB"
+binding = "RIDE_TRIP_PLANNER_DB"
 database_name = "ride-db"
 database_id = "368b270d-9442-4674-b52f-dc21c6592dae"
 
 # KV for session storage
 [[kv_namespaces]]
-binding = "SESSIONS"
+binding = "RIDE_TRIP_PLANNER_SESSIONS"
 id = "36162f4023ea404ab718b0b01d7622e1" # ride-sessions-ride-app
 
 # R2 bucket for file attachments (images, documents)
 [[r2_buckets]]
-binding = "ATTACHMENTS"
+binding = "RIDE_TRIP_PLANNER_ATTACHMENTS"
 bucket_name = "ride-attachments"
 # Create with: wrangler r2 bucket create ride-attachments
 

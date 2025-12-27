@@ -6,10 +6,27 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url TEXT,
   provider TEXT NOT NULL, -- 'google', 'facebook', 'microsoft'
   provider_id TEXT NOT NULL,
+  last_login TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   UNIQUE(provider, provider_id)
 );
+
+-- Linked identities (allow multiple SSO providers per email/user)
+CREATE TABLE IF NOT EXISTS auth_identities (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_login TEXT,
+  UNIQUE(provider, provider_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_identities_user ON auth_identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_identities_provider ON auth_identities(provider, provider_id);
 
 -- Short URLs table (for ultra-short sharing links)
 CREATE TABLE IF NOT EXISTS short_urls (
@@ -155,8 +172,10 @@ CREATE TABLE IF NOT EXISTS login_events (
   user_id TEXT,
   email TEXT,
   provider TEXT,
+  provider_id TEXT,
   ip TEXT,
   user_agent TEXT,
+  client_hints TEXT, -- JSON blob for device hints (sec-ch-ua*, cf headers)
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

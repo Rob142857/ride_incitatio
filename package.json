@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "npx serve -p 3000",
     "start": "npx serve -p 3000",
-    "deploy": "wrangler pages deploy . --project-name=ride",
+    "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create ride-db",
     "db:migrate": "wrangler d1 execute ride-db --file=./api/schema.sql",
     "db:migrate:local": "wrangler d1 execute ride-db --file=./api/schema.sql --local",
-    "kv:create": "wrangler kv:namespace create SESSIONS",
-    "dev:remote": "wrangler pages dev . --d1=ride-db --kv=SESSIONS",
+    "kv:create": "wrangler kv:namespace create RIDE_TRIP_PLANNER_SESSIONS",
+    "dev:remote": "wrangler dev --remote --d1=RIDE_TRIP_PLANNER_DB --kv=RIDE_TRIP_PLANNER_SESSIONS --r2=RIDE_TRIP_PLANNER_ATTACHMENTS",
     "setup": "echo 'Run: npm run db:create && npm run kv:create && update wrangler.toml with IDs && npm run db:migrate'"
   },
   "keywords": ["pwa", "trip", "navigation", "waypoints", "journal", "cloudflare"],
