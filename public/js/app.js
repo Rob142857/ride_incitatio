@@ -41,6 +41,14 @@ const App = {
     const authError = urlParams.get('error');
     const authErrorDesc = urlParams.get('error_description');
     this.isSharedView = !!sharedTripId;
+
+    // First-visit landing (do not show for shared/embed flows)
+    const landingSeen = (() => {
+      try { return localStorage.getItem('ride_landing_seen') === '1'; } catch (_) { return true; }
+    })();
+    if (!landingSeen && !this.isSharedView && !isEmbed) {
+      UI.showLandingGate();
+    }
     
     // Try to authenticate if cloud is available
     await this.checkAuth();
@@ -105,7 +113,9 @@ const App = {
       localStorage.removeItem('ride_last_user_id');
       this.currentUser = null;
       this.useCloud = false;
-      UI.showAuthGate('Signed out');
+      if (!UI.isLandingGateVisible()) {
+        UI.showAuthGate('Signed out');
+      }
       return false;
     } catch (error) {
       console.error('Auth check failed', error);
@@ -117,7 +127,9 @@ const App = {
       localStorage.removeItem('ride_last_user_id');
       this.currentUser = null;
       this.useCloud = false;
-      UI.showAuthGate('Signed out');
+      if (!UI.isLandingGateVisible()) {
+        UI.showAuthGate('Signed out');
+      }
       // Preserve existing useCloud flag so we can retry when online/focused
       return false;
     }
@@ -215,7 +227,14 @@ const App = {
    */
   showLoginPromptIfNeeded() {
     if (!this.currentUser && !this.loginPromptShown) {
-      UI.showAuthGate('Signed out');
+      const landingSeen = (() => {
+        try { return localStorage.getItem('ride_landing_seen') === '1'; } catch (_) { return true; }
+      })();
+      if (!landingSeen) {
+        UI.showLandingGate();
+      } else {
+        UI.showAuthGate('Signed out');
+      }
       this.loginPromptShown = true;
     }
   },
