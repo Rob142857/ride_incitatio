@@ -59,6 +59,13 @@ router.post('/api/trips/:id/share', requireAuth, TripsHandler.generateShareLink)
 // Short URL public trip API: /api/s/abc123 -> trip JSON data
 router.get('/api/s/:shortCode', TripsHandler.getSharedTrip);
 
+// Deploy sanity-check endpoint (no auth)
+// Bump DEPLOY_MARKER when you want to verify a new deploy via curl.
+router.get('/api/_deploy', () => {
+  const DEPLOY_MARKER = 'deploy-marker:2025-12-27T00:00Z:waypoint-precondition-v1';
+  return jsonResponse({ ok: true, marker: DEPLOY_MARKER, now: new Date().toISOString() });
+});
+
 // 404 for unmatched API routes
 router.all('/api/*', () => errorResponse('Not found', 404));
 

@@ -22,6 +22,13 @@ function conflictResponse(trip) {
   }, 409);
 }
 
+function preconditionRequiredResponse() {
+  return jsonResponse({
+    error: 'Precondition required: missing If-Match header.',
+    precondition_required: true
+  }, 428);
+}
+
 async function bumpTripVersion(env, tripId) {
   await env.RIDE_TRIP_PLANNER_DB.prepare(
     'UPDATE trips SET updated_at = datetime("now"), version = version + 1 WHERE id = ?'
@@ -283,9 +290,8 @@ export const TripsHandler = {
     }
 
     const ifMatch = parseIfMatchVersion(request);
-    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
-      return conflictResponse(trip);
-    }
+    if (ifMatch === null) return preconditionRequiredResponse();
+    if (Number(trip.version ?? 0) !== ifMatch) return conflictResponse(trip);
     
     if (!body?.name || body.lat === undefined || body.lng === undefined) {
       return errorResponse('Name, lat, and lng are required');
@@ -329,9 +335,8 @@ export const TripsHandler = {
     }
 
     const ifMatch = parseIfMatchVersion(request);
-    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
-      return conflictResponse(trip);
-    }
+    if (ifMatch === null) return preconditionRequiredResponse();
+    if (Number(trip.version ?? 0) !== ifMatch) return conflictResponse(trip);
     
     const updates = [];
     const values = [];
@@ -374,9 +379,8 @@ export const TripsHandler = {
     }
 
     const ifMatch = parseIfMatchVersion(request);
-    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
-      return conflictResponse(trip);
-    }
+    if (ifMatch === null) return preconditionRequiredResponse();
+    if (Number(trip.version ?? 0) !== ifMatch) return conflictResponse(trip);
     
     await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM waypoints WHERE id = ? AND trip_id = ?'
@@ -409,9 +413,8 @@ export const TripsHandler = {
     }
 
     const ifMatch = parseIfMatchVersion(request);
-    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
-      return conflictResponse(trip);
-    }
+    if (ifMatch === null) return preconditionRequiredResponse();
+    if (Number(trip.version ?? 0) !== ifMatch) return conflictResponse(trip);
     
     // Validate order contains every waypoint exactly once
     const existingWps = await env.RIDE_TRIP_PLANNER_DB.prepare(

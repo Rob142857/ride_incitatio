@@ -6,7 +6,7 @@ export function cors(response = new Response(null, { status: 204 })) {
   headers.set('Access-Control-Allow-Origin', BASE_URL);
   headers.set('Access-Control-Allow-Credentials', 'true');
   headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match');
   headers.set('Access-Control-Max-Age', '86400');
   headers.append('Vary', 'Origin');
   
@@ -23,7 +23,13 @@ export function cors(response = new Response(null, { status: 204 })) {
 export function jsonResponse(data, status = 200) {
   return cors(new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' }
+    headers: {
+      'Content-Type': 'application/json',
+      // Never cache API JSON. Prevents stale reads after writes (e.g. waypoint reorder).
+      'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0'
+    }
   }));
 }
 

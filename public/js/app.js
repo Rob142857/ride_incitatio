@@ -557,7 +557,7 @@ const App = {
       await this.refreshTripsList();
     } catch (error) {
       console.error('Failed to update waypoint details:', error);
-      if (error.status === 409) {
+        if (error.status === 409 || error.status === 428) {
         await this.handleTripConflict(error);
         return;
       }
@@ -583,7 +583,7 @@ const App = {
       this.renderWaypointAttachments(waypointId);
     } catch (err) {
       console.error('Waypoint attachment upload failed', err);
-      if (err.status === 409) {
+        if (err.status === 409 || err.status === 428) {
         await this.handleTripConflict(err);
         return;
       }
@@ -1506,7 +1506,7 @@ const App = {
       this.markTripWritten(this.currentTrip.id);
     } catch (error) {
       console.error('Failed to add waypoint to cloud:', error);
-      if (error.status === 409) {
+      if (error.status === 409 || error.status === 428) {
         await this.handleTripConflict(error);
         return null;
       }
@@ -1546,7 +1546,7 @@ const App = {
       }
     } catch (error) {
       console.error('Failed to update waypoint:', error);
-      if (error.status === 409) {
+      if (error.status === 409 || error.status === 428) {
         await this.handleTripConflict(error);
         return;
       }
@@ -1587,7 +1587,7 @@ const App = {
       this.applyTripMetaFromResponse(this.currentTrip, res);
     } catch (error) {
       console.error('Failed to delete waypoint:', error);
-      if (error.status === 409) {
+      if (error.status === 409 || error.status === 428) {
         await this.handleTripConflict(error);
         return;
       }
@@ -1642,7 +1642,7 @@ const App = {
       UI.showToast('Waypoint order saved', 'success');
     } catch (error) {
       console.error('Failed to reorder waypoints in cloud:', error);
-      if (error.status === 409) {
+      if (error.status === 409 || error.status === 428) {
         await this.handleTripConflict(error);
         return;
       }
@@ -1986,6 +1986,30 @@ const App = {
             if (this.currentTrip?.id !== freshTrip.id) return;
             const retryTrip = await loadFreshTrip(freshTrip.id);
             if (!retryTrip) return;
+
+            // Never apply an older server read over a newer local state.
+            const retryServerV = Number(retryTrip?.version);
+            const retryLocalV = Number(this.currentTrip?.version);
+            const retryServerTs = this.getTripSortTimestamp(retryTrip);
+            const retryLocalTs = this.getTripSortTimestamp(this.currentTrip);
+            const retryLocalWriteAt = this.tripWriteClock?.[retryTrip.id] || 0;
+
+            const retryStillOlder = (Number.isFinite(retryServerV) && Number.isFinite(retryLocalV) && retryServerV < retryLocalV)
+              || (retryLocalWriteAt && retryServerTs && retryServerTs + 1000 < retryLocalWriteAt)
+              || (retryLocalTs && retryServerTs && retryServerTs < retryLocalTs);
+
+            if (retryStillOlder) {
+              console.warn('Retry still returned older trip data; keeping local state', {
+                tripId: retryTrip.id,
+                retryServerV,
+                retryLocalV,
+                retryServerTs,
+                retryLocalTs,
+                retryLocalWriteAt
+              });
+              return;
+            }
+
             this.loadTripData(retryTrip);
           } catch (e) {
             // ignore retry errors
