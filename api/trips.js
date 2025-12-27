@@ -5,6 +5,29 @@
 
 import { jsonResponse, errorResponse, generateId, generateShortCode, generateShortCodeForId, parseBody, BASE_URL } from './utils.js';
 
+function parseIfMatchVersion(request) {
+  const raw = request?.headers?.get('If-Match');
+  if (!raw) return null;
+  const trimmed = raw.trim().replace(/^\"|\"$/g, '');
+  const n = Number.parseInt(trimmed, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function conflictResponse(trip) {
+  return jsonResponse({
+    error: 'Conflict: trip has changed on another device.',
+    conflict: true,
+    trip_version: trip?.version ?? 0,
+    trip_updated_at: trip?.updated_at ?? null
+  }, 409);
+}
+
+async function bumpTripVersion(env, tripId) {
+  await env.RIDE_TRIP_PLANNER_DB.prepare(
+    'UPDATE trips SET updated_at = datetime("now"), version = version + 1 WHERE id = ?'
+  ).bind(tripId).run();
+}
+
 export const TripsHandler = {
   /**
    * List all trips for current user
@@ -142,11 +165,17 @@ export const TripsHandler = {
     
     // Verify ownership
     const existing = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).first();
     
     if (!existing) {
       return errorResponse('Trip not found', 404);
+    }
+
+    // Optimistic concurrency control (multi-device safe writes)
+    const ifMatch = parseIfMatchVersion(request);
+    if (ifMatch !== null && Number(existing.version ?? 0) !== ifMatch) {
+      return conflictResponse(existing);
     }
     
     const updates = [];
@@ -188,6 +217,7 @@ export const TripsHandler = {
     
     if (updates.length > 0) {
       updates.push('updated_at = datetime("now")');
+      updates.push('version = version + 1');
       values.push(params.id);
       
       await env.RIDE_TRIP_PLANNER_DB.prepare(
@@ -207,6 +237,11 @@ export const TripsHandler = {
         body.route.distance || null,
         body.route.duration || null
       ).run();
+
+      // If this request only updated the route (no trip fields), still bump version.
+      if (updates.length === 0) {
+        await bumpTripVersion(env, params.id);
+      }
     }
     
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM trips WHERE id = ?').bind(params.id).first();
@@ -240,11 +275,16 @@ export const TripsHandler = {
     
     // Verify trip ownership
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
     if (!trip) {
       return errorResponse('Trip not found', 404);
+    }
+
+    const ifMatch = parseIfMatchVersion(request);
+    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
+      return conflictResponse(trip);
     }
     
     if (!body?.name || body.lat === undefined || body.lng === undefined) {
@@ -263,12 +303,13 @@ export const TripsHandler = {
       'INSERT INTO waypoints (id, trip_id, name, address, lat, lng, type, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(id, params.tripId, body.name, body.address || '', body.lat, body.lng, body.type || 'stop', body.notes || '', sortOrder).run();
     
-    // Update trip timestamp
-    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+    // Update trip timestamp + bump version
+    await bumpTripVersion(env, params.tripId);
     
     const waypoint = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(id).first();
-    
-    return jsonResponse({ waypoint }, 201);
+
+    const tripState = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT version, updated_at FROM trips WHERE id = ?').bind(params.tripId).first();
+    return jsonResponse({ waypoint, trip_version: tripState?.version ?? 0, trip_updated_at: tripState?.updated_at ?? null }, 201);
   },
   
   /**
@@ -280,11 +321,16 @@ export const TripsHandler = {
     
     // Verify trip ownership
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
     if (!trip) {
       return errorResponse('Trip not found', 404);
+    }
+
+    const ifMatch = parseIfMatchVersion(request);
+    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
+      return conflictResponse(trip);
     }
     
     const updates = [];
@@ -303,36 +349,43 @@ export const TripsHandler = {
         `UPDATE waypoints SET ${updates.join(', ')} WHERE id = ? AND trip_id = ?`
       ).bind(...values).run();
       
-      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+      await bumpTripVersion(env, params.tripId);
     }
     
     const waypoint = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM waypoints WHERE id = ?').bind(params.id).first();
-    
-    return jsonResponse({ waypoint });
+
+    const tripState = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT version, updated_at FROM trips WHERE id = ?').bind(params.tripId).first();
+    return jsonResponse({ waypoint, trip_version: tripState?.version ?? 0, trip_updated_at: tripState?.updated_at ?? null });
   },
   
   /**
    * Delete waypoint
    */
   async deleteWaypoint(context) {
-    const { env, user, params } = context;
+    const { env, user, params, request } = context;
     
     // Verify trip ownership
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
     if (!trip) {
       return errorResponse('Trip not found', 404);
+    }
+
+    const ifMatch = parseIfMatchVersion(request);
+    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
+      return conflictResponse(trip);
     }
     
     await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM waypoints WHERE id = ? AND trip_id = ?'
     ).bind(params.id, params.tripId).run();
     
-    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
-    
-    return jsonResponse({ success: true });
+    await bumpTripVersion(env, params.tripId);
+
+    const tripState = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT version, updated_at FROM trips WHERE id = ?').bind(params.tripId).first();
+    return jsonResponse({ success: true, trip_version: tripState?.version ?? 0, trip_updated_at: tripState?.updated_at ?? null });
   },
   
   /**
@@ -348,11 +401,16 @@ export const TripsHandler = {
     
     // Verify trip ownership
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
     if (!trip) {
       return errorResponse('Trip not found', 404);
+    }
+
+    const ifMatch = parseIfMatchVersion(request);
+    if (ifMatch !== null && Number(trip.version ?? 0) !== ifMatch) {
+      return conflictResponse(trip);
     }
     
     // Update each waypoint's order
@@ -362,9 +420,10 @@ export const TripsHandler = {
       ).bind(i, body.order[i], params.tripId).run();
     }
     
-    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
-    
-    return jsonResponse({ success: true });
+    await bumpTripVersion(env, params.tripId);
+
+    const tripState = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT version, updated_at FROM trips WHERE id = ?').bind(params.tripId).first();
+    return jsonResponse({ success: true, trip_version: tripState?.version ?? 0, trip_updated_at: tripState?.updated_at ?? null });
   },
   
   /**
@@ -402,8 +461,8 @@ export const TripsHandler = {
       JSON.stringify(body.tags || []),
       body.location ? JSON.stringify(body.location) : null
     ).run();
-    
-    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+
+    await bumpTripVersion(env, params.tripId);
     
     const entry = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(id).first();
     
@@ -448,8 +507,8 @@ export const TripsHandler = {
       await env.RIDE_TRIP_PLANNER_DB.prepare(
         `UPDATE journal_entries SET ${updates.join(', ')} WHERE id = ? AND trip_id = ?`
       ).bind(...values).run();
-      
-      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+
+      await bumpTripVersion(env, params.tripId);
     }
     
     const entry = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM journal_entries WHERE id = ?').bind(params.id).first();
@@ -481,8 +540,8 @@ export const TripsHandler = {
     await env.RIDE_TRIP_PLANNER_DB.prepare(
       'DELETE FROM journal_entries WHERE id = ? AND trip_id = ?'
     ).bind(params.id, params.tripId).run();
-    
-    await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+
+    await bumpTripVersion(env, params.tripId);
     
     return jsonResponse({ success: true });
   },
@@ -717,7 +776,7 @@ export const TripsHandler = {
         ).bind(`${BASE_URL}/api/attachments/${id}`, params.tripId).run();
       }
     
-      await env.RIDE_TRIP_PLANNER_DB.prepare('UPDATE trips SET updated_at = datetime("now") WHERE id = ?').bind(params.tripId).run();
+      await bumpTripVersion(env, params.tripId);
 
       const attachment = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(id).first();
 

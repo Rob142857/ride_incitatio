@@ -940,6 +940,33 @@ const App = {
     this.tripWriteClock[tripId] = Date.now();
   },
 
+  getTripIfMatchHeaders(trip = this.currentTrip) {
+    const version = Number(trip?.version);
+    if (!Number.isFinite(version)) return {};
+    return { 'If-Match': String(version) };
+  },
+
+  applyTripMetaFromResponse(trip, meta) {
+    if (!trip || !meta) return;
+    if (meta.trip_version !== undefined) {
+      const v = Number(meta.trip_version);
+      if (Number.isFinite(v)) trip.version = v;
+    }
+    if (meta.trip_updated_at !== undefined && meta.trip_updated_at) {
+      trip.updated_at = meta.trip_updated_at;
+      trip.updatedAt = meta.trip_updated_at;
+    }
+  },
+
+  async handleTripConflict(err) {
+    UI.showToast('Trip changed on another device. Reloading latest…', 'info');
+    try {
+      await this.refreshData('conflict');
+    } catch (_) {
+      // ignore
+    }
+  },
+
   applyTripOrder(trips) {
     const normalizedTrips = trips.map((t) => this.normalizeTrip(t));
     const order = Storage.getTripOrder() || [];
@@ -1152,6 +1179,11 @@ const App = {
       trip.waypoints = Trip.normalizeWaypointOrder(trip.waypoints);
     }
     trip = this.normalizeTrip(trip);
+    if (!Number.isFinite(Number(trip.version))) {
+      trip.version = 0;
+    } else {
+      trip.version = Number(trip.version);
+    }
     this.attachJournalAttachments(trip);
     this.currentTrip = trip;
     
@@ -1259,8 +1291,6 @@ const App = {
   async saveCurrentTrip() {
     if (!this.currentTrip) return;
     
-    this.currentTrip.updatedAt = new Date().toISOString();
-    
     if (this.useCloud && this.currentUser) {
       try {
         const route = this.currentTrip.route
@@ -1272,7 +1302,7 @@ const App = {
             }
           : null;
 
-        await API.trips.update(this.currentTrip.id, {
+        const updated = await API.trips.update(this.currentTrip.id, {
           name: this.currentTrip.name,
           description: this.currentTrip.description,
           settings: this.currentTrip.settings,
@@ -1280,10 +1310,26 @@ const App = {
           cover_image_url: this.currentTrip.cover_image_url,
           cover_focus_x: this.currentTrip.cover_focus_x,
           cover_focus_y: this.currentTrip.cover_focus_y
-        });
+        }, { headers: this.getTripIfMatchHeaders() });
+
+        if (updated) {
+          if (updated.updated_at) {
+            this.currentTrip.updated_at = updated.updated_at;
+            this.currentTrip.updatedAt = updated.updated_at;
+          }
+          if (updated.version !== undefined) {
+            const v = Number(updated.version);
+            if (Number.isFinite(v)) this.currentTrip.version = v;
+          }
+        }
+        this.markTripWritten(this.currentTrip.id);
         return true;
       } catch (error) {
         console.error('Failed to save to cloud:', error);
+        if (error.status === 409) {
+          await this.handleTripConflict(error);
+          return false;
+        }
         if (error.status === 404) {
           // Trip missing on server; recover by reloading or creating a fresh trip
           UI.showToast('Trip missing on server. Reloading your trips…', 'error');
@@ -1307,14 +1353,19 @@ const App = {
 
     let waypoint;
     try {
-      waypoint = await API.waypoints.add(this.currentTrip.id, data);
+      const res = await API.waypoints.add(this.currentTrip.id, data, { headers: this.getTripIfMatchHeaders() });
+      waypoint = res.waypoint;
+      this.applyTripMetaFromResponse(this.currentTrip, res);
       if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
       this.currentTrip.waypoints.push(waypoint);
       this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
-      this.currentTrip.updatedAt = new Date().toISOString();
       this.markTripWritten(this.currentTrip.id);
     } catch (error) {
       console.error('Failed to add waypoint to cloud:', error);
+      if (error.status === 409) {
+        await this.handleTripConflict(error);
+        return null;
+      }
       UI.showToast('Could not add waypoint (not saved)', 'error');
       return null;
     }
@@ -1343,17 +1394,19 @@ const App = {
     if (!this.ensureEditable('move waypoints')) return;
 
     try {
-      await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng });
+      const res = await API.waypoints.update(this.currentTrip.id, waypointId, { lat, lng }, { headers: this.getTripIfMatchHeaders() });
+      this.applyTripMetaFromResponse(this.currentTrip, res);
     } catch (error) {
       console.error('Failed to update waypoint:', error);
+      if (error.status === 409) {
+        await this.handleTripConflict(error);
+        return;
+      }
       UI.showToast('Move failed. Not saved to cloud.', 'error');
       return;
     }
     
     Trip.updateWaypoint(this.currentTrip, waypointId, { lat, lng });
-    // Mark locally as updated immediately so a quick tab switch doesn't clobber
-    // this new state if the subsequent refresh hits an older replica/edge.
-    this.currentTrip.updatedAt = new Date().toISOString();
     this.markTripWritten(this.currentTrip.id);
     await this.saveCurrentTrip();
 
@@ -1380,13 +1433,17 @@ const App = {
     if (!this.ensureEditable('delete waypoints')) return;
     
     try {
-      await API.waypoints.delete(this.currentTrip.id, waypointId);
+      const res = await API.waypoints.delete(this.currentTrip.id, waypointId, { headers: this.getTripIfMatchHeaders() });
+      this.applyTripMetaFromResponse(this.currentTrip, res);
     } catch (error) {
       console.error('Failed to delete waypoint:', error);
+      if (error.status === 409) {
+        await this.handleTripConflict(error);
+        return;
+      }
     }
     
     Trip.removeWaypoint(this.currentTrip, waypointId);
-    this.currentTrip.updatedAt = new Date().toISOString();
     this.markTripWritten(this.currentTrip.id);
     this.saveCurrentTrip();
     
@@ -1421,11 +1478,10 @@ const App = {
       Trip.reorderWaypoints(this.currentTrip, orderIds);
 
       // Persist
-      await API.waypoints.reorder(this.currentTrip.id, orderIds);
+      const res = await API.waypoints.reorder(this.currentTrip.id, orderIds, { headers: this.getTripIfMatchHeaders() });
+      this.applyTripMetaFromResponse(this.currentTrip, res);
 
       await this.saveCurrentTrip();
-
-      this.currentTrip.updatedAt = new Date().toISOString();
       this.markTripWritten(this.currentTrip.id);
 
       // Refresh UI and map
@@ -1436,6 +1492,10 @@ const App = {
       UI.showToast('Waypoint order saved', 'success');
     } catch (error) {
       console.error('Failed to reorder waypoints in cloud:', error);
+      if (error.status === 409) {
+        await this.handleTripConflict(error);
+        return;
+      }
       UI.showToast('Reorder failed. Not saved to cloud.', 'error');
     } finally {
       this.setWaypointsSaving(false);
@@ -1752,9 +1812,13 @@ const App = {
       // Guard against clobbering: if we *just* wrote in this tab and the server read
       // appears older, keep local state and retry once shortly after.
       const localWriteAt = this.tripWriteClock?.[freshTrip.id] || 0;
+      const serverV = Number(freshTrip?.version);
+      const localV = Number(this.currentTrip?.version);
       const serverTs = this.getTripSortTimestamp(freshTrip);
       const localTs = this.getTripSortTimestamp(this.currentTrip);
-      const serverLooksOlderThanLocal = (localWriteAt && serverTs && serverTs + 1000 < localWriteAt) || (localTs && serverTs && serverTs < localTs);
+      const serverLooksOlderThanLocal = (Number.isFinite(serverV) && Number.isFinite(localV) && serverV < localV)
+        || (localWriteAt && serverTs && serverTs + 1000 < localWriteAt)
+        || (localTs && serverTs && serverTs < localTs);
 
       if (source === 'visibility' && serverLooksOlderThanLocal) {
         console.warn('Refresh returned older trip data; retrying shortly', { source, tripId: freshTrip.id, serverTs, localTs, localWriteAt });

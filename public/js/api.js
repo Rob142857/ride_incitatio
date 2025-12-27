@@ -141,10 +141,11 @@ const API = {
       return data.trip;
     },
 
-    async update(id, tripData) {
+    async update(id, tripData, options = {}) {
       const data = await API.request(`/trips/${id}`, {
         method: 'PUT',
         body: tripData,
+        ...(options || {}),
       });
       return data.trip;
     },
@@ -161,32 +162,34 @@ const API = {
 
   // Waypoint methods
   waypoints: {
-    async add(tripId, waypointData) {
-      const data = await API.request(`/trips/${tripId}/waypoints`, {
+    async add(tripId, waypointData, options = {}) {
+      return await API.request(`/trips/${tripId}/waypoints`, {
         method: 'POST',
         body: waypointData,
+        ...(options || {}),
       });
-      return data.waypoint;
     },
 
-    async update(tripId, waypointId, waypointData) {
-      const data = await API.request(`/trips/${tripId}/waypoints/${waypointId}`, {
+    async update(tripId, waypointId, waypointData, options = {}) {
+      return await API.request(`/trips/${tripId}/waypoints/${waypointId}`, {
         method: 'PUT',
         body: waypointData,
+        ...(options || {}),
       });
-      return data.waypoint;
     },
 
-    async delete(tripId, waypointId) {
-      await API.request(`/trips/${tripId}/waypoints/${waypointId}`, {
+    async delete(tripId, waypointId, options = {}) {
+      return await API.request(`/trips/${tripId}/waypoints/${waypointId}`, {
         method: 'DELETE',
+        ...(options || {}),
       });
     },
 
-    async reorder(tripId, orderArray) {
-      await API.request(`/trips/${tripId}/waypoints/reorder`, {
+    async reorder(tripId, orderArray, options = {}) {
+      return await API.request(`/trips/${tripId}/waypoints/reorder`, {
         method: 'PUT',
         body: { order: orderArray },
+        ...(options || {}),
       });
     },
   },

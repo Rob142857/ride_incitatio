@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS trips (
   share_id TEXT UNIQUE,
   short_code TEXT UNIQUE, -- 6-char short URL code
   is_public INTEGER DEFAULT 0,
+  version INTEGER NOT NULL DEFAULT 0,
   -- Public display settings (no personal info)
   public_title TEXT, -- Custom title for public view
   public_description TEXT, -- Description for public view
