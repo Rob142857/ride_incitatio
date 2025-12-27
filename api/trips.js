@@ -5,6 +5,47 @@
 
 import { jsonResponse, errorResponse, generateId, generateShortCode, generateShortCodeForId, parseBody, BASE_URL } from './utils.js';
 
+function safeJsonParse(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function orderWaypointsWithTripSettings(waypointsRows, tripSettings) {
+  const waypoints = Array.isArray(waypointsRows) ? waypointsRows : [];
+  const settings = safeJsonParse(tripSettings, {});
+  const order = Array.isArray(settings?.waypoint_order) ? settings.waypoint_order.map((id) => String(id)) : null;
+
+  if (!order || !order.length) {
+    return waypoints;
+  }
+
+  const byId = new Map(waypoints.map((w) => [String(w.id), w]));
+  const existingIds = new Set(waypoints.map((w) => String(w.id)));
+  const unique = new Set(order);
+
+  // Only trust persisted ordering if it includes every waypoint exactly once.
+  if (unique.size !== order.length || order.length !== existingIds.size) {
+    return waypoints;
+  }
+  for (const id of unique) {
+    if (!existingIds.has(id)) return waypoints;
+  }
+
+  const ordered = order.map((id, idx) => {
+    const w = byId.get(id);
+    // Override sort_order in the response so clients don't re-sort back to stale DB values.
+    return { ...w, sort_order: idx };
+  });
+
+  return ordered;
+}
+
 function parseIfMatchVersion(request) {
   const raw = request?.headers?.get('If-Match');
   if (!raw) return null;
@@ -120,6 +161,9 @@ export const TripsHandler = {
     const waypoints = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT * FROM waypoints WHERE trip_id = ? ORDER BY sort_order'
     ).bind(params.id).all();
+
+    // Use trip-level persisted waypoint ordering when present.
+    const orderedWaypoints = orderWaypointsWithTripSettings(waypoints.results, trip.settings);
     
     // Get journal entries (all - owner can see private)
     const journal = await env.RIDE_TRIP_PLANNER_DB.prepare(
@@ -145,9 +189,9 @@ export const TripsHandler = {
     return jsonResponse({
       trip: {
         ...trip,
-        settings: JSON.parse(trip.settings || '{}'),
+        settings: safeJsonParse(trip.settings || '{}', {}),
         short_url: trip.short_code ? `${BASE_URL}/${trip.short_code}` : null,
-        waypoints: waypoints.results,
+        waypoints: orderedWaypoints,
         journal: journal.results.map(e => ({
           ...e,
           tags: JSON.parse(e.tags || '[]'),
@@ -405,7 +449,7 @@ export const TripsHandler = {
     
     // Verify trip ownership
     const trip = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at, settings FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.tripId, user.id).first();
     
     if (!trip) {
@@ -442,8 +486,15 @@ export const TripsHandler = {
         'UPDATE waypoints SET sort_order = ? WHERE id = ? AND trip_id = ?'
       ).bind(i, desired[i], params.tripId).run();
     }
-    
-    await bumpTripVersion(env, params.tripId);
+
+    // Persist ordering on the trip row as well. This avoids read-after-write inconsistencies
+    // where the trip version replicates before per-waypoint sort_order updates.
+    const settings = safeJsonParse(trip.settings || '{}', {});
+    settings.waypoint_order = desired;
+
+    await env.RIDE_TRIP_PLANNER_DB.prepare(
+      'UPDATE trips SET settings = ?, updated_at = datetime("now"), version = version + 1 WHERE id = ?'
+    ).bind(JSON.stringify(settings), params.tripId).run();
 
     const tripState = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT version, updated_at FROM trips WHERE id = ?').bind(params.tripId).first();
     return jsonResponse({ success: true, trip_version: tripState?.version ?? 0, trip_updated_at: tripState?.updated_at ?? null });
@@ -639,6 +690,8 @@ export const TripsHandler = {
     const waypoints = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, name, lat, lng, type, sort_order FROM waypoints WHERE trip_id = ? ORDER BY sort_order'
     ).bind(trip.id).all();
+
+    const orderedWaypoints = orderWaypointsWithTripSettings(waypoints.results, trip.settings);
     
     // Get PUBLIC journal entries only (is_private = 0)
     const journal = await env.RIDE_TRIP_PLANNER_DB.prepare(
@@ -668,7 +721,7 @@ export const TripsHandler = {
         contact: trip.public_contact || null,
         cover_image: coverUrl,
         created_at: trip.created_at,
-        waypoints: waypoints.results.map(w => ({
+        waypoints: orderedWaypoints.map(w => ({
           id: w.id,
           name: w.name,
           lat: w.lat,
