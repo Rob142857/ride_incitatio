@@ -216,7 +216,7 @@ export const TripsHandler = {
     
     // Verify ownership
     const existing = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id, version, updated_at FROM trips WHERE id = ? AND user_id = ?'
+      'SELECT id, version, updated_at, settings FROM trips WHERE id = ? AND user_id = ?'
     ).bind(params.id, user.id).first();
     
     if (!existing) {
@@ -241,8 +241,17 @@ export const TripsHandler = {
       values.push(body.description);
     }
     if (body.settings !== undefined) {
+      const existingSettings = safeJsonParse(existing.settings || '{}', {});
+      let mergedSettings = body.settings;
+      if (body.settings && typeof body.settings === 'object' && !Array.isArray(body.settings)) {
+        mergedSettings = { ...existingSettings, ...body.settings };
+        // Allow explicit clearing by setting key to null.
+        if (Object.prototype.hasOwnProperty.call(body.settings, 'waypoint_order') && body.settings.waypoint_order === null) {
+          delete mergedSettings.waypoint_order;
+        }
+      }
       updates.push('settings = ?');
-      values.push(JSON.stringify(body.settings));
+      values.push(JSON.stringify(mergedSettings));
     }
     if (body.is_public !== undefined) {
       updates.push('is_public = ?');

@@ -1573,6 +1573,11 @@ const App = {
       if (!this.currentTrip.waypoints) this.currentTrip.waypoints = [];
       this.currentTrip.waypoints.push(waypoint);
       this.currentTrip.waypoints = Trip.normalizeWaypointOrder(this.currentTrip.waypoints);
+
+      // Preserve persisted ordering if present; otherwise initialize from current list.
+      if (!this.currentTrip.settings || typeof this.currentTrip.settings !== 'object') this.currentTrip.settings = {};
+      const ids = (this.currentTrip.waypoints || []).map((w) => w.id);
+      this.currentTrip.settings.waypoint_order = ids;
       this.markTripWritten(this.currentTrip.id);
     } catch (error) {
       console.error('Failed to add waypoint to cloud:', error);
@@ -1663,6 +1668,10 @@ const App = {
     }
     
     Trip.removeWaypoint(this.currentTrip, waypointId);
+
+    if (!this.currentTrip.settings || typeof this.currentTrip.settings !== 'object') this.currentTrip.settings = {};
+    const ids = (this.currentTrip.waypoints || []).map((w) => w.id);
+    this.currentTrip.settings.waypoint_order = ids;
     this.markTripWritten(this.currentTrip.id);
     
     MapManager.removeWaypointMarker(waypointId);
@@ -1698,6 +1707,12 @@ const App = {
       // Persist
       const res = await API.waypoints.reorder(this.currentTrip.id, orderIds, { headers: this.getTripIfMatchHeaders() });
       this.applyTripMetaFromResponse(this.currentTrip, res);
+
+      // Keep settings in sync so subsequent saveCurrentTrip() calls (e.g., route autosave)
+      // don't overwrite the trip settings and wipe the persisted waypoint order.
+      if (!this.currentTrip.settings || typeof this.currentTrip.settings !== 'object') this.currentTrip.settings = {};
+      this.currentTrip.settings.waypoint_order = Array.isArray(orderIds) ? orderIds.slice() : [];
+
       this.markTripWritten(this.currentTrip.id);
 
       // Refresh UI and map

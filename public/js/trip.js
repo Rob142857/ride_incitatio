@@ -38,17 +38,11 @@ const Trip = {
    * Normalize waypoint ordering (maps sort_order -> order and sorts array)
    */
   normalizeWaypointOrder(waypoints = []) {
+    // Server already orders waypoints using persisted waypoint_order from trip.settings,
+    // so preserve the array order as-is and just sync the order/sort_order fields to indices.
     return (Array.isArray(waypoints) ? waypoints : []).map((wp, idx) => {
-      // In cloud mode, the authoritative persisted ordering is `sort_order`.
-      // Prefer it whenever present to avoid stale `order` fields clobbering
-      // server state after merges/updates.
-      const order = Number.isFinite(wp.sort_order)
-        ? wp.sort_order
-        : Number.isFinite(wp.order)
-          ? wp.order
-          : idx;
-      return { ...wp, order, sort_order: Number.isFinite(wp.sort_order) ? wp.sort_order : order };
-    }).sort((a, b) => a.order - b.order);
+      return { ...wp, order: idx, sort_order: idx };
+    });
   },
 
   /**
