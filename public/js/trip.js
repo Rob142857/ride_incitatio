@@ -14,22 +14,22 @@ const Trip = {
       updatedAt: new Date().toISOString(),
       waypoints: [],
       route: null,
-      customRoutePoints: [],
       journal: [],
+      coverImageUrl: '',
       cover_image_url: '',
+      coverFocusX: 50,
       cover_focus_x: 50,
+      coverFocusY: 50,
       cover_focus_y: 50,
-      is_public: false,
+      isPublic: false,
+      is_public: 0,
+      shortCode: null,
       short_code: null,
+      shareId: null,
+      share_id: null,
+      version: 0,
       settings: {
-        routingProfile: 'driving',
-        avoidTolls: false,
-        avoidHighways: false
-      },
-      shareSettings: {
-        isPublic: false,
-        shareId: null,
-        includePrivateNotes: false
+        routingProfile: 'driving'
       }
     };
   },
@@ -38,10 +38,8 @@ const Trip = {
    * Normalize waypoint ordering (maps sort_order -> order and sorts array)
    */
   normalizeWaypointOrder(waypoints = []) {
-    // Server already orders waypoints using persisted waypoint_order from trip.settings,
-    // so preserve the array order as-is and just sync the order/sort_order fields to indices.
     return (Array.isArray(waypoints) ? waypoints : []).map((wp, idx) => {
-      return { ...wp, order: idx, sort_order: idx };
+      return { ...wp, order: idx };
     });
   },
 
@@ -52,13 +50,11 @@ const Trip = {
     return {
       id: Storage.generateId(),
       name: data.name || 'Waypoint',
-      address: data.address || '',
       lat: data.lat,
       lng: data.lng,
       type: data.type || 'stop',
       notes: data.notes || '',
       order: data.order || 0,
-      sort_order: data.sort_order ?? (data.order || 0),
       createdAt: new Date().toISOString()
     };
   },
@@ -73,9 +69,7 @@ const Trip = {
       content: data.content || '',
       isPrivate: data.isPrivate || false,
       tags: data.tags || [],
-      waypointId: data.waypointId || null,
-      location: data.location || null,
-      photos: data.photos || [],
+      attachments: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -112,10 +106,8 @@ const Trip = {
    */
   removeWaypoint(trip, waypointId) {
     trip.waypoints = trip.waypoints.filter(w => w.id !== waypointId);
-    // Reorder remaining waypoints
     trip.waypoints.forEach((w, i) => {
       w.order = i;
-      w.sort_order = i;
     });
     trip.updatedAt = new Date().toISOString();
   },
@@ -141,10 +133,8 @@ const Trip = {
       if (w && w.id && !seen.has(w.id)) reordered.push(w);
     });
 
-    // Re-number order contiguously
     reordered.forEach((w, idx) => {
       w.order = idx;
-      w.sort_order = idx;
     });
 
     trip.waypoints = reordered;
@@ -216,38 +206,6 @@ const Trip = {
   },
 
   /**
-   * Generate share ID if not exists
-   */
-  generateShareId(trip) {
-    this.ensureShareSettings(trip);
-    if (!trip.shareSettings.shareId) {
-      trip.shareSettings.shareId = trip.share_id || trip.short_code || Storage.generateId();
-    }
-    return trip.shareSettings.shareId;
-  },
-
-  /**
-   * Ensure shareSettings exists and is aligned with server fields
-   */
-  ensureShareSettings(trip) {
-    if (!trip) return trip;
-    if (!trip.shareSettings) {
-      trip.shareSettings = {
-        shareId: trip.share_id || trip.short_code || Storage.generateId(),
-        isPublic: !!trip.is_public,
-        includePrivateNotes: false
-      };
-    } else {
-      trip.shareSettings.shareId = trip.shareSettings.shareId || trip.share_id || trip.short_code || Storage.generateId();
-      trip.shareSettings.isPublic = trip.shareSettings.isPublic ?? !!trip.is_public;
-      if (trip.shareSettings.includePrivateNotes === undefined) {
-        trip.shareSettings.includePrivateNotes = false;
-      }
-    }
-    return trip;
-  },
-
-  /**
    * Get shareable version of trip (without private data)
    */
   getShareableData(trip, options = {}) {
@@ -256,16 +214,14 @@ const Trip = {
     const includePublicNotes = options.includePublicNotes !== false;
 
     return {
-      id: trip.shareSettings.shareId || trip.id,
+      id: trip.shareId || trip.shortCode || trip.id,
       name: trip.name,
       description: trip.description,
-      cover_image: trip.cover_image_url || null,
-      cover_image_url: trip.cover_image_url || null,
-      cover_focus_x: Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50,
-      cover_focus_y: Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50,
+      coverImageUrl: trip.coverImageUrl || trip.cover_image_url || '',
+      coverFocusX: trip.coverFocusX ?? trip.cover_focus_x ?? 50,
+      coverFocusY: trip.coverFocusY ?? trip.cover_focus_y ?? 50,
       waypoints: includeWaypoints ? trip.waypoints : [],
       route: includeRoute ? trip.route : null,
-      customRoutePoints: includeRoute ? trip.customRoutePoints : [],
       journal: includePublicNotes ? this.getPublicJournal(trip) : [],
       createdAt: trip.createdAt,
       stats: this.getStats(trip)

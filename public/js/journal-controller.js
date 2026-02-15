@@ -246,9 +246,7 @@ Object.assign(App, {
     this.prefetchTiles();
     this.rideRerouting = false;
     this.offRouteCounter = 0;
-    if (routeData.coordinates) {
-      this.currentTrip.customRoutePoints = routeData.coordinates.map(c => ({ lat: c.lat, lng: c.lng }));
-    }
+
     UI.updateTripStats(this.currentTrip);
     const ok = await this.saveCurrentTrip();
     if (ok) {

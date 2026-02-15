@@ -8,11 +8,12 @@ const Share = {
   async openShareModal() {
     // Set public toggle state
     const publicToggle = document.getElementById('sharePublicToggle');
-    publicToggle.checked = !!App.currentTrip?.is_public;
+    publicToggle.checked = !!(App.currentTrip?.isPublic ?? App.currentTrip?.is_public);
     publicToggle.onchange = async (e) => {
       try {
         await API.trips.update(App.currentTrip.id, { is_public: e.target.checked });
-        App.currentTrip.is_public = e.target.checked;
+        App.currentTrip.isPublic = e.target.checked;
+        App.currentTrip.is_public = e.target.checked ? 1 : 0;
         UI.showToast(e.target.checked ? 'Trip is now public' : 'Trip is now private', 'success');
       } catch {
         UI.showToast('Failed to update sharing', 'error');
@@ -25,25 +26,29 @@ const Share = {
     }
 
     // Start with any server-provided link already on the trip (DB source)
-    let shareUrl = App.currentTrip?.short_url && App.currentTrip.is_public
-      ? App.currentTrip.short_url
+    let shareUrl = (App.currentTrip?.shortUrl || App.currentTrip?.short_url) && (App.currentTrip.isPublic || App.currentTrip.is_public)
+      ? (App.currentTrip.shortUrl || App.currentTrip.short_url)
       : '';
 
     // Cloud mode: only hit API if we need to create/refresh (no short code yet or not public)
-    if (App.useCloud && App.currentUser && (!App.currentTrip.short_code || !App.currentTrip.is_public)) {
+    if (App.useCloud && App.currentUser && (!(App.currentTrip.shortCode || App.currentTrip.short_code) || !(App.currentTrip.isPublic || App.currentTrip.is_public))) {
       try {
         const result = await API.trips.share(App.currentTrip.id);
         if (result?.shortCode) {
+          App.currentTrip.shortCode = result.shortCode;
           App.currentTrip.short_code = result.shortCode;
-          App.currentTrip.short_url = result.shareUrl || `${window.location.origin.replace(/\/$/, '')}/${result.shortCode}`;
-          App.currentTrip.is_public = true;
-          shareUrl = App.currentTrip.short_url;
+          const url = result.shareUrl || `${window.location.origin.replace(/\/$/, '')}/${result.shortCode}`;
+          App.currentTrip.shortUrl = url;
+          App.currentTrip.short_url = url;
+          App.currentTrip.isPublic = true;
+          App.currentTrip.is_public = 1;
+          shareUrl = url;
         }
       } catch (err) {
         console.error('Share link generation failed', err);
         // If a short code already exists, fall back to it; otherwise fail loudly (no offline fallback in cloud mode)
-        if (App.currentTrip?.short_code) {
-          shareUrl = `${window.location.origin.replace(/\/$/, '')}/${App.currentTrip.short_code}`;
+        if (App.currentTrip?.shortCode || App.currentTrip?.short_code) {
+          shareUrl = `${window.location.origin.replace(/\/$/, '')}/${App.currentTrip.shortCode || App.currentTrip.short_code}`;
         } else {
           UI.showToast('Failed to generate share link. Check you are online and signed in.', 'error');
           return;
@@ -52,12 +57,13 @@ const Share = {
     }
 
     // Local/offline fallback
-    if (!shareUrl) {
-      Trip.generateShareId(App.currentTrip);
-      App.saveCurrentTrip();
-      const shareId = App.currentTrip.shareSettings.shareId;
+    if (!shareUrl && App.currentTrip?.shortCode) {
       const baseUrl = window.location.origin.replace(/\/$/, '');
-      shareUrl = `${baseUrl}/${shareId}`;
+      shareUrl = `${baseUrl}/${App.currentTrip.shortCode}`;
+    }
+    if (!shareUrl) {
+      UI.showToast('Unable to generate share link', 'error');
+      return;
     }
 
     document.getElementById('shareLink').value = shareUrl;
@@ -254,7 +260,6 @@ const Share = {
     if (data.description) trip.description = data.description;
     if (data.waypoints) trip.waypoints = data.waypoints;
     if (data.route) trip.route = data.route;
-    if (data.customRoutePoints) trip.customRoutePoints = data.customRoutePoints;
     if (data.journal) trip.journal = data.journal;
     
     // Generate new IDs to avoid conflicts
@@ -269,13 +274,12 @@ const Share = {
    * Load shared trip from URL
    */
   loadSharedTrip(shareId) {
-    // In a real app, this would fetch from a server
-    // For this demo, we check localStorage for any trip with this share ID
+    // Cloud trips are loaded via API in app-core.js loadSharedTrip()
+    // This local fallback checks localStorage for any trip with this share ID
     const trips = Storage.getTrips();
-    const trip = trips.find(t => t.shareSettings?.shareId === shareId);
+    const trip = trips.find(t => (t.shareId || t.shortCode || t.share_id || t.short_code) === shareId);
     
     if (trip) {
-      // Return public version
       return Trip.getShareableData(trip, {
         includeWaypoints: true,
         includeRoute: true,
@@ -290,12 +294,10 @@ const Share = {
    * Generate embeddable URL for notes apps
    */
   getEmbedUrl(trip) {
-    if (!trip.shareSettings.shareId) {
-      Trip.generateShareId(trip);
-    }
-    
+    const shareId = trip.shareId || trip.shortCode || trip.share_id || trip.short_code;
+    if (!shareId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?trip=${trip.shareSettings.shareId}&embed=true`;
+    return `${baseUrl}?trip=${shareId}&embed=true`;
   },
 
   /**

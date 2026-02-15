@@ -95,8 +95,9 @@ const App = {
   normalizeTrip(trip) {
     if (!trip) return trip;
     const normalized = { ...trip };
-    if (!normalized.updatedAt && normalized.updated_at) normalized.updatedAt = normalized.updated_at;
+    // Ensure camelCase aliases exist (API normalizer handles most, but locally-created trips may not have them)
     if (!normalized.createdAt && normalized.created_at) normalized.createdAt = normalized.created_at;
+    if (!normalized.updatedAt && normalized.updated_at) normalized.updatedAt = normalized.updated_at;
     if (normalized.waypoints) normalized.waypoints = Trip.normalizeWaypointOrder(normalized.waypoints);
     if (normalized.route) {
       const duration = normalized.route.duration ?? normalized.route.time ?? null;
@@ -105,13 +106,19 @@ const App = {
         coordinates: normalized.route.coordinates || []
       };
     }
-    if (!Number.isFinite(normalized.cover_focus_x)) normalized.cover_focus_x = 50;
-    if (!Number.isFinite(normalized.cover_focus_y)) normalized.cover_focus_y = 50;
+    // Ensure cover focus defaults
+    if (!Number.isFinite(normalized.coverFocusX)) normalized.coverFocusX = normalized.cover_focus_x ?? 50;
+    if (!Number.isFinite(normalized.coverFocusY)) normalized.coverFocusY = normalized.cover_focus_y ?? 50;
+    normalized.cover_focus_x = normalized.coverFocusX;
+    normalized.cover_focus_y = normalized.coverFocusY;
+    // Ensure coverImageUrl alias
+    if (!normalized.coverImageUrl) normalized.coverImageUrl = normalized.cover_image_url || '';
+    normalized.cover_image_url = normalized.coverImageUrl;
     return normalized;
   },
 
   getTripSortTimestamp(trip) {
-    const ts = trip?.updatedAt || trip?.updated_at || trip?.createdAt || trip?.created_at;
+    const ts = trip?.updatedAt || trip?.createdAt;
     return ts ? new Date(ts).getTime() : 0;
   },
 
@@ -226,14 +233,26 @@ const App = {
       if (sharedData) {
         const trip = Trip.create(sharedData.name);
         trip.waypoints = Trip.normalizeWaypointOrder(sharedData.waypoints || []);
-        trip.journal = sharedData.journal || [];
-        trip.customRoutePoints = sharedData.customRoutePoints || [];
-        trip.share_id = sharedData.share_id;
-        trip.short_code = sharedData.short_code;
-        trip.is_public = sharedData.is_public;
-        trip.cover_image_url = sharedData.cover_image_url || sharedData.cover_image || '';
-        trip.cover_focus_x = Number.isFinite(sharedData.cover_focus_x) ? sharedData.cover_focus_x : 50;
-        trip.cover_focus_y = Number.isFinite(sharedData.cover_focus_y) ? sharedData.cover_focus_y : 50;
+        trip.journal = (sharedData.journal || []).map(e => ({
+          ...e,
+          isPrivate: !!(e.is_private ?? e.isPrivate),
+          createdAt: e.created_at ?? e.createdAt,
+          updatedAt: e.updated_at ?? e.updatedAt,
+          tags: Array.isArray(e.tags) ? e.tags : [],
+          attachments: e.attachments || [],
+        }));
+        trip.shareId = sharedData.share_id ?? sharedData.shareId;
+        trip.share_id = trip.shareId;
+        trip.shortCode = sharedData.short_code ?? sharedData.shortCode;
+        trip.short_code = trip.shortCode;
+        trip.isPublic = !!(sharedData.is_public ?? sharedData.isPublic);
+        trip.is_public = trip.isPublic ? 1 : 0;
+        trip.coverImageUrl = sharedData.cover_image_url || sharedData.coverImageUrl || sharedData.cover_image || '';
+        trip.cover_image_url = trip.coverImageUrl;
+        trip.coverFocusX = Number.isFinite(sharedData.cover_focus_x) ? sharedData.cover_focus_x : (sharedData.coverFocusX ?? 50);
+        trip.cover_focus_x = trip.coverFocusX;
+        trip.coverFocusY = Number.isFinite(sharedData.cover_focus_y) ? sharedData.cover_focus_y : (sharedData.coverFocusY ?? 50);
+        trip.cover_focus_y = trip.coverFocusY;
         this.loadTripData(trip);
         if (isEmbed) {
           document.getElementById('bottomNav').classList.add('hidden');

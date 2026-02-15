@@ -112,7 +112,6 @@ Object.assign(App, {
   },
 
   loadTripData(trip) {
-    Trip.ensureShareSettings(trip);
     if (trip.waypoints) trip.waypoints = Trip.normalizeWaypointOrder(trip.waypoints);
     trip = this.normalizeTrip(trip);
     if (!Number.isFinite(Number(trip.version))) trip.version = 0;
@@ -226,9 +225,9 @@ Object.assign(App, {
         description: this.currentTrip.description,
         settings: this.currentTrip.settings,
         route,
-        cover_image_url: this.currentTrip.cover_image_url,
-        cover_focus_x: this.currentTrip.cover_focus_x,
-        cover_focus_y: this.currentTrip.cover_focus_y
+        cover_image_url: this.currentTrip.coverImageUrl || this.currentTrip.cover_image_url,
+        cover_focus_x: this.currentTrip.coverFocusX ?? this.currentTrip.cover_focus_x,
+        cover_focus_y: this.currentTrip.coverFocusY ?? this.currentTrip.cover_focus_y
       }, { headers: this.getTripIfMatchHeaders() });
       if (updated) {
         if (updated.updated_at) {
@@ -400,16 +399,16 @@ Object.assign(App, {
     document.getElementById('tripDetailName').value = trip.name || '';
     document.getElementById('tripDetailDescription').value = trip.description || '';
     const coverInput = document.getElementById('tripDetailCover');
-    if (coverInput) coverInput.value = trip.cover_image_url || '';
+    if (coverInput) coverInput.value = trip.coverImageUrl || trip.cover_image_url || '';
     const focusXInput = document.getElementById('tripDetailCoverFocusX');
     const focusYInput = document.getElementById('tripDetailCoverFocusY');
-    if (focusXInput) focusXInput.value = Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50;
-    if (focusYInput) focusYInput.value = Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50;
+    if (focusXInput) focusXInput.value = Number.isFinite(trip.coverFocusX) ? trip.coverFocusX : (Number.isFinite(trip.cover_focus_x) ? trip.cover_focus_x : 50);
+    if (focusYInput) focusYInput.value = Number.isFinite(trip.coverFocusY) ? trip.coverFocusY : (Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50);
     const coverFileName = document.getElementById('tripDetailCoverFileName');
     if (coverFileName) coverFileName.textContent = '';
-    document.getElementById('tripDetailPublic').checked = !!trip.is_public;
+    document.getElementById('tripDetailPublic').checked = !!(trip.isPublic ?? trip.is_public);
     const linkInput = document.getElementById('tripDetailLink');
-    const link = trip.short_url || (trip.short_code ? `${window.location.origin}/${trip.short_code}` : '');
+    const link = trip.shortUrl || trip.short_url || ((trip.shortCode || trip.short_code) ? `${window.location.origin}/${trip.shortCode || trip.short_code}` : '');
     linkInput.value = link || '';
     document.getElementById('tripDetailsModal').dataset.tripId = trip.id;
     this.updateCoverFocusUI();
@@ -449,13 +448,17 @@ Object.assign(App, {
       if (isPublic) {
         const share = await API.trips.share(tripId);
         updatedTrip = await API.trips.get(tripId);
+        updatedTrip.shortUrl = share.shareUrl;
         updatedTrip.short_url = share.shareUrl;
+        updatedTrip.shortCode = share.shortCode;
         updatedTrip.short_code = share.shortCode;
       } else {
         updatedTrip = await API.trips.get(tripId);
       }
       updatedTrip = this.normalizeTrip(updatedTrip);
+      updatedTrip.coverFocusX = coverFocusX;
       updatedTrip.cover_focus_x = coverFocusX;
+      updatedTrip.coverFocusY = coverFocusY;
       updatedTrip.cover_focus_y = coverFocusY;
       if (this.currentTrip?.id === updatedTrip.id) {
         this.currentTrip = { ...this.currentTrip, ...updatedTrip };

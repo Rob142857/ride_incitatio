@@ -57,7 +57,7 @@ Object.assign(App, {
     const listEl = document.getElementById('waypointAttachmentList');
     if (!listEl) return;
     const all = Array.isArray(this.currentTrip?.attachments) ? this.currentTrip.attachments : [];
-    const attachments = all.filter(a => a && a.waypoint_id === waypointId);
+    const attachments = all.filter(a => a && (a.waypointId === waypointId || a.waypoint_id === waypointId));
     if (!attachments.length) {
       listEl.innerHTML = '<div class="microcopy">No attachments yet.</div>';
       return;

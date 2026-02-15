@@ -1,6 +1,106 @@
 /**
  * API Client - handles all backend communication
+ *
+ * Normalization layer: all server responses go through normalize helpers
+ * that map snake_case DB fields → consistent camelCase for the client.
+ * The client always works with camelCase; snake_case only exists in API
+ * request bodies sent TO the server (which expects them).
  */
+
+/** Normalize a single journal entry from server snake_case → client camelCase */
+function _normalizeEntry(e) {
+  if (!e) return e;
+  return {
+    ...e,
+    isPrivate: !!(e.is_private ?? e.isPrivate),
+    waypointId: e.waypoint_id ?? e.waypointId ?? null,
+    createdAt: e.created_at ?? e.createdAt,
+    updatedAt: e.updated_at ?? e.updatedAt,
+    tags: typeof e.tags === 'string' ? JSON.parse(e.tags) : (e.tags || []),
+    location: typeof e.location === 'string' ? JSON.parse(e.location) : (e.location || null),
+    attachments: e.attachments || [],
+  };
+}
+
+/** Normalize a single attachment from server snake_case → client camelCase */
+function _normalizeAttachment(a) {
+  if (!a) return a;
+  return {
+    ...a,
+    journalEntryId: a.journal_entry_id ?? a.journalEntryId ?? null,
+    waypointId: a.waypoint_id ?? a.waypointId ?? null,
+    originalName: a.original_name ?? a.originalName ?? a.filename,
+    mimeType: a.mime_type ?? a.mimeType,
+    sizeBytes: a.size_bytes ?? a.sizeBytes,
+    isCover: !!(a.is_cover ?? a.isCover),
+    isPrivate: !!(a.is_private ?? a.isPrivate),
+    createdAt: a.created_at ?? a.createdAt,
+  };
+}
+
+/** Normalize a single waypoint from server snake_case → client camelCase */
+function _normalizeWaypoint(w) {
+  if (!w) return w;
+  return {
+    ...w,
+    order: w.sort_order ?? w.order ?? 0,
+    createdAt: w.created_at ?? w.createdAt,
+  };
+}
+
+/** Normalize a full trip (with embedded waypoints, journal, attachments, route) */
+function _normalizeTrip(t) {
+  if (!t) return t;
+  const trip = {
+    ...t,
+    createdAt: t.created_at ?? t.createdAt,
+    updatedAt: t.updated_at ?? t.updatedAt,
+    isPublic: !!(t.is_public ?? t.isPublic),
+    coverImageUrl: t.cover_image_url ?? t.coverImageUrl ?? '',
+    coverFocusX: Number.isFinite(t.cover_focus_x) ? t.cover_focus_x : (Number.isFinite(t.coverFocusX) ? t.coverFocusX : 50),
+    coverFocusY: Number.isFinite(t.cover_focus_y) ? t.cover_focus_y : (Number.isFinite(t.coverFocusY) ? t.coverFocusY : 50),
+    shortCode: t.short_code ?? t.shortCode ?? null,
+    shortUrl: t.short_url ?? t.shortUrl ?? null,
+    shareId: t.share_id ?? t.shareId ?? null,
+    settings: typeof t.settings === 'string' ? JSON.parse(t.settings || '{}') : (t.settings || {}),
+    version: Number(t.version ?? 0),
+  };
+  // Also keep snake_case aliases for server round-trips (update payloads)
+  trip.is_public = trip.isPublic ? 1 : 0;
+  trip.cover_image_url = trip.coverImageUrl;
+  trip.cover_focus_x = trip.coverFocusX;
+  trip.cover_focus_y = trip.coverFocusY;
+  trip.short_code = trip.shortCode;
+  trip.short_url = trip.shortUrl;
+  trip.share_id = trip.shareId;
+
+  if (Array.isArray(trip.waypoints)) trip.waypoints = trip.waypoints.map(_normalizeWaypoint);
+  if (Array.isArray(trip.journal)) trip.journal = trip.journal.map(_normalizeEntry);
+  if (Array.isArray(trip.attachments)) trip.attachments = trip.attachments.map(_normalizeAttachment);
+  if (trip.route) {
+    const duration = trip.route.duration ?? trip.route.time ?? null;
+    trip.route = { ...trip.route, duration, time: duration, coordinates: trip.route.coordinates || [] };
+  }
+  return trip;
+}
+
+/** Normalize a trip-list item (no embedded children) */
+function _normalizeTripSummary(t) {
+  if (!t) return t;
+  return {
+    ...t,
+    createdAt: t.created_at ?? t.createdAt,
+    updatedAt: t.updated_at ?? t.updatedAt,
+    isPublic: !!(t.is_public ?? t.isPublic),
+    shortCode: t.short_code ?? t.shortCode ?? null,
+    shortUrl: t.short_url ?? t.shortUrl ?? null,
+    // keep snake_case aliases for UI compat
+    is_public: !!(t.is_public ?? t.isPublic),
+    short_code: t.short_code ?? t.shortCode ?? null,
+    short_url: t.short_url ?? t.shortUrl ?? null,
+  };
+}
+
 const API = {
   baseUrl: '/api',
 
@@ -125,12 +225,12 @@ const API = {
   trips: {
     async list() {
       const data = await API.request('/trips');
-      return data.trips;
+      return (data.trips || []).map(_normalizeTripSummary);
     },
 
     async get(id) {
       const data = await API.request(`/trips/${id}`);
-      return data.trip;
+      return _normalizeTrip(data.trip);
     },
 
     async create(tripData) {
@@ -138,7 +238,7 @@ const API = {
         method: 'POST',
         body: tripData,
       });
-      return data.trip;
+      return _normalizeTrip(data.trip);
     },
 
     async update(id, tripData, options = {}) {
@@ -147,7 +247,7 @@ const API = {
         body: tripData,
         ...(options || {}),
       });
-      return data.trip;
+      return _normalizeTrip(data.trip);
     },
 
     async delete(id) {
@@ -201,7 +301,7 @@ const API = {
         method: 'POST',
         body: entryData,
       });
-      return data.entry;
+      return _normalizeEntry(data.entry);
     },
 
     async update(tripId, entryId, entryData) {
@@ -209,7 +309,7 @@ const API = {
         method: 'PUT',
         body: entryData,
       });
-      return data.entry;
+      return _normalizeEntry(data.entry);
     },
 
     async delete(tripId, entryId) {
@@ -235,7 +335,7 @@ const API = {
         body: formData,
         headers: options.headers || {},
       });
-      return data.attachment;
+      return _normalizeAttachment(data.attachment);
     },
 
     async delete(attachmentId, options = {}) {

@@ -687,8 +687,8 @@ const UI = {
     const orderedWaypoints = (Array.isArray(waypoints) ? waypoints : [])
       .slice()
       .sort((a, b) => {
-        const ao = Number.isFinite(a?.order) ? a.order : (Number.isFinite(a?.sort_order) ? a.sort_order : 0);
-        const bo = Number.isFinite(b?.order) ? b.order : (Number.isFinite(b?.sort_order) ? b.sort_order : 0);
+        const ao = Number.isFinite(a?.order) ? a.order : 0;
+        const bo = Number.isFinite(b?.order) ? b.order : 0;
         return ao - bo;
       });
 
@@ -925,14 +925,14 @@ const UI = {
     }
 
     container.innerHTML = entries
-      .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .map(entry => `
         <div class="journal-entry ${entry.isPrivate ? 'private' : ''}" data-id="${entry.id}">
           <div class="journal-header">
             <div class="journal-title">
               ${entry.isPrivate ? '🔒 ' : ''}${this.escapeHtml(entry.title)}
             </div>
-            <div class="journal-date">${this.formatDate(entry.createdAt || entry.created_at)}</div>
+            <div class="journal-date">${this.formatDate(entry.createdAt)}</div>
           </div>
           <div class="journal-content">${this.escapeHtml(entry.content)}</div>
           ${entry.attachments?.length ? `
