@@ -344,6 +344,14 @@ const API = {
         headers: options.headers || {},
       });
     },
+
+    async update(attachmentId, data) {
+      const result = await API.request(`/attachments/${attachmentId}`, {
+        method: 'PUT',
+        body: data,
+      });
+      return _normalizeAttachment(result.attachment);
+    },
   },
 
   // Places search (Google Places via backend proxy)

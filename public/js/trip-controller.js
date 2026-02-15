@@ -415,7 +415,82 @@ Object.assign(App, {
     const link = trip.shortUrl || trip.short_url || ((trip.shortCode || trip.short_code) ? `${window.location.origin}/${trip.shortCode || trip.short_code}` : '');
     linkInput.value = link || '';
     document.getElementById('tripDetailsModal').dataset.tripId = trip.id;
+    this.populateCoverPicker(trip);
     this.updateCoverFocusUI();
+  },
+
+  /**
+   * Populate the cover image picker with thumbnails of existing trip images
+   */
+  populateCoverPicker(trip) {
+    const row = document.getElementById('coverPickerRow');
+    const grid = document.getElementById('coverPickerGrid');
+    if (!row || !grid) return;
+
+    const images = (trip.attachments || []).filter(a => {
+      const mime = a.mimeType || a.mime_type || '';
+      return mime.startsWith('image/');
+    });
+
+    if (!images.length) {
+      row.style.display = 'none';
+      grid.innerHTML = '';
+      return;
+    }
+
+    row.style.display = '';
+    const currentCoverUrl = trip.coverImageUrl || trip.cover_image_url || '';
+
+    grid.innerHTML = images.map(img => {
+      const url = img.url || `/api/attachments/${img.id}`;
+      const isCover = img.isCover || img.is_cover || currentCoverUrl.includes(img.id);
+      return `<div class="cover-picker-thumb${isCover ? ' is-cover' : ''}" data-attachment-id="${img.id}" data-url="${url}" title="${img.originalName || img.original_name || 'Photo'}">
+        <img src="${url}" alt="" loading="lazy">
+        ${isCover ? '<span class="cover-badge">Cover</span>' : ''}
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.cover-picker-thumb').forEach(thumb => {
+      thumb.addEventListener('click', () => this.setCoverFromAttachment(thumb.dataset.attachmentId, thumb.dataset.url));
+    });
+  },
+
+  /**
+   * Set an existing attachment as the cover image
+   */
+  async setCoverFromAttachment(attachmentId, url) {
+    if (!this.useCloud || !this.currentUser) {
+      UI.showToast('Sign in to change the cover', 'error');
+      return;
+    }
+    try {
+      await API.attachments.update(attachmentId, { is_cover: true });
+      // Update the cover URL input and preview
+      const coverInput = document.getElementById('tripDetailCover');
+      if (coverInput) coverInput.value = url;
+      // Clear any file pick
+      if (this._coverBlobUrl) { URL.revokeObjectURL(this._coverBlobUrl); this._coverBlobUrl = null; }
+      const coverFileInput = document.getElementById('tripDetailCoverFile');
+      if (coverFileInput) coverFileInput.value = '';
+      const coverFileName = document.getElementById('tripDetailCoverFileName');
+      if (coverFileName) coverFileName.textContent = '';
+      // Update highlight in the picker grid
+      document.querySelectorAll('.cover-picker-thumb').forEach(t => {
+        const isSelected = t.dataset.attachmentId === attachmentId;
+        t.classList.toggle('is-cover', isSelected);
+        const badge = t.querySelector('.cover-badge');
+        if (isSelected && !badge) {
+          t.insertAdjacentHTML('beforeend', '<span class="cover-badge">Cover</span>');
+        } else if (!isSelected && badge) {
+          badge.remove();
+        }
+      });
+      this.updateCoverFocusUI();
+      UI.showToast('Cover image updated', 'success');
+    } catch (err) {
+      console.error('Set cover from attachment failed:', err);
+      UI.showToast('Failed to set cover image', 'error');
+    }
   },
 
   async saveTripDetails() {

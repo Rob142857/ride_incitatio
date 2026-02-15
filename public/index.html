@@ -462,6 +462,13 @@
             </div>
           </div>
 
+          <div class="field-row" id="coverPickerRow" style="display:none">
+            <div>
+              <label class="field-label">Or choose from trip photos</label>
+              <div id="coverPickerGrid" class="cover-picker-grid"></div>
+            </div>
+          </div>
+
           <div class="field-row cover-focus-grid">
             <div>
               <label class="field-label">Cover focus</label>
@@ -536,12 +543,24 @@
   <script src="js/journal-controller.js"></script>
   <script src="js/ride-controller.js"></script>
   
-  <!-- Service Worker Registration -->
+  <!-- Service Worker Registration & Live Update Listener -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js')
         .then(reg => console.log('SW registered'))
         .catch(err => console.log('SW registration failed:', err));
+
+      // Listen for build updates pushed by the SW
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'ride:update') {
+          console.log('[App] New build detected:', event.data.build);
+          // Brief toast, then seamless reload
+          if (typeof UI !== 'undefined' && UI.showToast) {
+            UI.showToast('Updating…', 'info');
+          }
+          setTimeout(() => location.reload(), 600);
+        }
+      });
     }
   </script>
 </body>

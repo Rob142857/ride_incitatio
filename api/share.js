@@ -81,6 +81,7 @@ export const ShareHandler = {
     // Cover image
     const coverImage = attachments.results.find(a => a.is_cover) || attachments.results.find(a => a.mime_type?.startsWith('image/'));
     const coverUrl = trip.cover_image_url || (coverImage ? `${BASE_URL}/api/attachments/${coverImage.id}` : null);
+    const coverId = coverImage?.id;
 
     return jsonResponse({
       trip: {
@@ -89,6 +90,8 @@ export const ShareHandler = {
         description: trip.public_description || trip.description || '',
         contact: trip.public_contact || null,
         cover_image: coverUrl,
+        cover_focus_x: trip.cover_focus_x ?? 50,
+        cover_focus_y: trip.cover_focus_y ?? 50,
         created_at: trip.created_at,
         waypoints: orderedWaypoints.map(w => ({
           id: w.id, name: w.name, lat: w.lat, lng: w.lng, type: w.type, sort_order: w.sort_order
@@ -97,10 +100,12 @@ export const ShareHandler = {
           id: e.id, title: e.title, content: e.content,
           tags: JSON.parse(e.tags || '[]'), created_at: e.created_at
         })),
-        attachments: attachments.results.map(a => ({
-          id: a.id, name: a.original_name, type: a.mime_type,
-          caption: a.caption, url: `${BASE_URL}/api/attachments/${a.id}`
-        })),
+        attachments: attachments.results
+          .filter(a => a.id !== coverId)
+          .map(a => ({
+            id: a.id, name: a.original_name, type: a.mime_type,
+            caption: a.caption, url: `${BASE_URL}/api/attachments/${a.id}`
+          })),
         route: routeData ? {
           coordinates: JSON.parse(routeData.coordinates || '[]'),
           distance: routeData.distance, duration: routeData.duration

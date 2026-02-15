@@ -15,6 +15,11 @@ import { AccountHandler } from './account.js';
 import { PlacesHandler } from './places.js';
 import { cors, jsonResponse, errorResponse, requireAuth, requireAdmin, optionalAuth, BASE_URL } from './utils.js';
 
+// Build fingerprint — changes on every deploy. Used by service worker and client
+// to detect code updates and trigger cache invalidation + seamless reload.
+// Updated automatically by deploy script, or manually before shipping.
+const BUILD_ID = '2026-02-15T03';
+
 const router = new Router();
 
 // CORS preflight
@@ -71,6 +76,28 @@ router.get('/api/_deploy', () => {
   return jsonResponse({ ok: true, marker: DEPLOY_MARKER, now: new Date().toISOString() });
 });
 
+// Build version endpoint — lightweight, no auth
+// Clients and service workers poll this to detect code updates.
+router.get('/api/_build', () => {
+  return new Response(JSON.stringify({ build: BUILD_ID }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
+
+// Trip version check — returns just id+version for the current user's trips.
+// Used by the client to poll for stale data without fetching full trip payloads.
+router.get('/api/trips/versions', requireAuth, async (context) => {
+  const { env, user } = context;
+  const rows = await env.RIDE_TRIP_PLANNER_DB.prepare(
+    'SELECT id, version, updated_at FROM trips WHERE user_id = ?'
+  ).bind(user.id).all();
+  return jsonResponse({ trips: rows.results });
+});
+
 // 404 for unmatched API routes
 router.all('/api/*', () => errorResponse('Not found', 404));
 
@@ -83,7 +110,7 @@ const CSP = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://ride.incitat.io https://lh3.googleusercontent.com https://*.microsoft.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://ride.incitat.io https://lh3.googleusercontent.com https://*.microsoft.com",
   "connect-src 'self' https://ride.incitat.io https://maps.incitat.io https://router.project-osrm.org https://nominatim.openstreetmap.org",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -101,6 +128,9 @@ function addSecurityHeaders(response) {
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   headers.set('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=()');
   headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  // Build fingerprint lets clients detect code updates
+  headers.set('X-Build-ID', BUILD_ID);
+  headers.set('ETag', `"${BUILD_ID}"`);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 

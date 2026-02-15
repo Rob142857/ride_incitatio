@@ -1,15 +1,40 @@
-const CACHE_NAME = 'ride-v4-2025-12-27';
+/**
+ * Ride Service Worker — Build-aware caching with seamless updates
+ *
+ * Strategy:
+ *   App shell (HTML/CSS/JS/icons) → Network-first, cache fallback
+ *   API requests                  → Network-only (never cached)
+ *   Map tiles                     → Stale-while-revalidate (separate cache)
+ *   Routing                       → Network-only
+ *
+ * On activate and every 2 minutes, polls /api/_build.
+ * If the server build ID differs → purge app-shell cache, re-fetch assets,
+ * and post a 'ride:update' message to all clients so they can reload.
+ */
+
+const CACHE_NAME = 'ride-v5';
+const TILES_CACHE = 'ride-tiles';
+
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/css/app.css',
+  '/css/global.css',
+  '/js/api.js',
+  '/js/app.js',
+  '/js/app-core.js',
+  '/js/auth-controller.js',
+  '/js/trip-controller.js',
+  '/js/waypoint-controller.js',
+  '/js/journal-controller.js',
+  '/js/ride-controller.js',
+  '/js/utils.js',
   '/js/storage.js',
   '/js/trip.js',
   '/js/map.js',
   '/js/ui.js',
   '/js/share.js',
-  '/js/app.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
 ];
@@ -21,51 +46,98 @@ const EXTERNAL_ASSETS = [
   'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js'
 ];
 
-// Install event - cache static assets
+/* ── Build version tracking ──────────────────────────────────────────── */
+let knownBuildId = null;
+
+async function fetchBuildId() {
+  try {
+    const res = await fetch('/api/_build', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.build || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function checkForUpdate() {
+  const remoteBuild = await fetchBuildId();
+  if (!remoteBuild) return;
+
+  if (knownBuildId && remoteBuild !== knownBuildId) {
+    console.log(`[SW] Build changed: ${knownBuildId} → ${remoteBuild}`);
+    knownBuildId = remoteBuild;
+
+    // Purge app-shell cache (keep tiles — they're content-addressed)
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== TILES_CACHE).map(k => caches.delete(k)));
+
+    // Re-populate with fresh assets
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(STATIC_ASSETS.map(u => new Request(u, { cache: 'reload' })));
+
+    // Tell every open tab to reload
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(c => c.postMessage({ type: 'ride:update', build: remoteBuild }));
+  } else if (!knownBuildId) {
+    knownBuildId = remoteBuild;
+  }
+}
+
+/* ── Install ─────────────────────────────────────────────────────────── */
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Caching static assets');
-      // Cache static assets
-      cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' })));
-      // Cache external assets
-      return cache.addAll(EXTERNAL_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[SW] Caching app shell');
+      await cache.addAll(STATIC_ASSETS.map(u => new Request(u, { cache: 'reload' })));
+      await cache.addAll(EXTERNAL_ASSETS);
     })
   );
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+/* ── Activate ────────────────────────────────────────────────────────── */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+    (async () => {
+      // Clean legacy caches
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter(n => n !== CACHE_NAME && n !== TILES_CACHE)
+          .map(n => caches.delete(n))
       );
-    })
+      await self.clients.claim();
+      await checkForUpdate();
+    })()
   );
-  self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+/* ── Periodic build polling (every 2 min while SW is alive) ──────── */
+setInterval(() => checkForUpdate(), 2 * 60 * 1000);
+
+/* ── Fetch ───────────────────────────────────────────────────────────── */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
+  // Non-GET → pass through
   if (request.method !== 'GET') return;
 
-  // Never cache API responses (prevents stale trip data after updates)
+  // ── API: network only ──
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // For app shell assets, prefer network so deploys propagate immediately.
-  // Still fall back to cache for offline support.
-  const isAppShellAsset = url.origin === self.location.origin && (
+  // ── Share target redirect ──
+  if (url.pathname === '/share') {
+    event.respondWith(Response.redirect('/?shared=true'));
+    return;
+  }
+
+  // ── App shell: network first, cache fallback ──
+  const isAppShell = url.origin === self.location.origin && (
     url.pathname === '/' ||
     url.pathname === '/index.html' ||
     url.pathname === '/manifest.json' ||
@@ -74,12 +146,12 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/icons/')
   );
 
-  if (isAppShellAsset) {
+  if (isAppShell) {
     event.respondWith(
       fetch(request).then((response) => {
         if (response && response.status === 200) {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          caches.open(CACHE_NAME).then(c => c.put(request, copy));
         }
         return response;
       }).catch(() => caches.match(request))
@@ -87,64 +159,45 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip tile requests (let them go to network)
-  if (url.hostname.includes('tile.openstreetmap.org')) {
+  // ── Map tiles: stale-while-revalidate ──
+  if (url.hostname.includes('tile.openstreetmap.org') ||
+      url.hostname.includes('basemaps.cartocdn.com') ||
+      url.hostname.includes('arcgisonline.com')) {
     event.respondWith(
-      caches.open('tiles-cache').then((cache) => {
-        return cache.match(request).then((cached) => {
-          const fetched = fetch(request).then((response) => {
-            cache.put(request, response.clone());
-            return response;
+      caches.open(TILES_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const network = fetch(request).then((res) => {
+            if (res && res.status === 200) cache.put(request, res.clone());
+            return res;
           }).catch(() => cached);
-          
-          return cached || fetched;
-        });
-      })
+          return cached || network;
+        })
+      )
     );
     return;
   }
 
-  // Skip routing API requests
-  if (url.hostname.includes('router.project-osrm.org')) {
+  // ── OSRM routing: network only ──
+  if (url.hostname.includes('router.project-osrm.org') ||
+      url.hostname.includes('maps.incitat.io')) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // For other requests, try cache first, then network
+  // ── Everything else: cache first ──
   event.respondWith(
     caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-
+      if (cached) return cached;
       return fetch(request).then((response) => {
-        // Don't cache non-successful responses
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
-
-        // Clone and cache the response
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseToCache);
-        });
-
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(c => c.put(request, copy));
         return response;
       });
     }).catch(() => {
-      // Return offline page for navigation requests
-      if (request.mode === 'navigate') {
-        return caches.match('/index.html');
-      }
+      if (request.mode === 'navigate') return caches.match('/index.html');
     })
   );
-});
-
-// Handle share target
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  if (url.pathname === '/share' && event.request.method === 'GET') {
-    event.respondWith(Response.redirect('/?shared=true'));
-  }
 });
