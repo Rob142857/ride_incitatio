@@ -43,6 +43,8 @@
     .toolbar button:hover { background: var(--neutral-100); border-color: var(--neutral-300); }
     .toolbar button.primary { background: var(--accent); color: var(--white); border-color: var(--accent); }
     .toolbar button.primary:hover { opacity: 0.85; }
+    .toolbar button.danger { background: #ef4444; color: var(--white); border-color: #ef4444; }
+    .toolbar button.danger:hover { opacity: 0.85; }
     .toolbar .spacer { flex: 1; }
     .toolbar .count { font-size: 0.78rem; color: var(--neutral-500); }
     .toolbar input[type="search"] { padding: 5px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 0.78rem; width: 180px; outline: none; }
@@ -63,13 +65,20 @@
     .badge-google { background: #fef3c7; color: #92400e; }
     .badge-microsoft { background: #dbeafe; color: #1e40af; }
     .badge-default { background: var(--neutral-200); color: var(--neutral-700); }
+    .badge-active { background: #dcfce7; color: #166534; }
+    .badge-suspended { background: #fef3c7; color: #92400e; }
+    .badge-banned { background: #fee2e2; color: #991b1b; }
     .muted { color: var(--neutral-500); }
     td.email-cell { font-weight: 500; }
     input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
     .avatar { width: 22px; height: 22px; border-radius: 50%; vertical-align: middle; margin-right: 6px; background: var(--neutral-200); }
     .avatar-initial { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.65rem; font-weight: 600; color: #fff; vertical-align: middle; margin-right: 6px; }
+    .avatar-lg { width: 48px; height: 48px; border-radius: 50%; vertical-align: middle; background: var(--neutral-200); }
+    .avatar-initial-lg { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; font-size: 1.2rem; font-weight: 700; color: #fff; vertical-align: middle; }
     .mono { font-family: var(--font-mono); font-size: 0.75rem; }
+    .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.78rem; font-weight: 500; padding: 0; text-decoration: underline; }
+    .link-btn:hover { opacity: 0.7; }
 
     /* Tabs */
     .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--neutral-200); margin-bottom: 16px; }
@@ -77,10 +86,62 @@
     .tab:hover { color: var(--neutral-900); }
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+    /* Modal overlay */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; overflow-y: auto; padding: 24px; }
+    .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .modal { background: var(--white); border-radius: 14px; width: 100%; max-width: 820px; margin: 20px auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; }
+    .modal-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--neutral-200); }
+    .modal-header .modal-title { flex: 1; }
+    .modal-header .modal-title h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    .modal-header .modal-title p { margin: 2px 0 0; font-size: 0.78rem; color: var(--neutral-500); }
+    .modal-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--neutral-500); padding: 4px; line-height: 1; }
+    .modal-close:hover { color: var(--neutral-900); }
+    .modal-body { padding: 20px 24px; max-height: calc(100vh - 200px); overflow-y: auto; }
+    .modal-body section { margin-bottom: 24px; }
+    .modal-body section:last-child { margin-bottom: 0; }
+    .modal-body h3 { font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--neutral-500); margin: 0 0 10px; }
+
+    /* Flags */
+    .flag { display: flex; gap: 8px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 0.78rem; line-height: 1.4; }
+    .flag-alert { background: #fee2e2; color: #991b1b; }
+    .flag-warning { background: #fef3c7; color: #92400e; }
+    .flag-info { background: #eff6ff; color: #1e40af; }
+    .flag-category { font-weight: 600; text-transform: uppercase; font-size: 0.68rem; min-width: 85px; }
+    .flag-clean { padding: 10px 14px; background: #dcfce7; color: #166534; border-radius: 8px; font-size: 0.82rem; font-weight: 500; }
+
+    /* Image grid */
+    .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+    .img-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid var(--neutral-200); transition: transform 0.15s ease; }
+    .img-grid img:hover { transform: scale(1.04); }
+
+    /* Trip cards */
+    .trip-card { padding: 10px 14px; border: 1px solid var(--neutral-200); border-radius: 8px; margin-bottom: 8px; }
+    .trip-card .trip-name { font-weight: 600; font-size: 0.85rem; }
+    .trip-card .trip-meta { font-size: 0.75rem; color: var(--neutral-500); margin-top: 2px; }
+
+    /* Notes list */
+    .note-item { padding: 8px 12px; border-left: 3px solid var(--neutral-300); margin-bottom: 8px; background: var(--neutral-50); border-radius: 0 8px 8px 0; }
+    .note-item .note-meta { font-size: 0.7rem; color: var(--neutral-500); margin-bottom: 2px; }
+    .note-item .note-text { font-size: 0.82rem; }
+    .note-item[data-action="ban"], .note-item[data-action="banned"] { border-left-color: #ef4444; }
+    .note-item[data-action="suspend"], .note-item[data-action="suspended"] { border-left-color: #f59e0b; }
+    .note-item[data-action="restore"] { border-left-color: #10b981; }
+
+    /* Action bar */
+    .action-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px 24px; border-top: 1px solid var(--neutral-200); background: var(--neutral-50); }
+    .action-bar textarea { flex: 1; min-width: 200px; padding: 8px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 0.82rem; resize: vertical; min-height: 36px; font-family: inherit; outline: none; }
+    .action-bar textarea:focus { border-color: var(--accent); }
+
+    /* Login table inside modal */
+    .login-mini { font-size: 0.75rem; }
+    .login-mini th, .login-mini td { padding: 5px 8px; }
+
     /* Responsive */
     @media (max-width: 640px) {
       .stat-grid { grid-template-columns: repeat(2, 1fr); }
       .toolbar input[type="search"] { width: 100%; }
+      .modal { margin: 8px; border-radius: 10px; }
+      .modal-body { padding: 14px 16px; }
     }
   </style>
 </head>
@@ -131,10 +192,11 @@
             <th>User</th>
             <th>Email</th>
             <th>Provider</th>
+            <th>Status</th>
             <th>Trips</th>
-            <th>Identities</th>
             <th>Created</th>
             <th>Last Login</th>
+            <th style="width:60px"></th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -167,10 +229,37 @@
     </div>
   </div>
 
+  <!-- Audit modal -->
+  <div class="modal-overlay" id="auditOverlay" onclick="if(event.target===this)closeAudit()">
+    <div class="modal">
+      <div class="modal-header">
+        <div id="auditAvatar"></div>
+        <div class="modal-title">
+          <h2 id="auditName"></h2>
+          <p id="auditMeta"></p>
+        </div>
+        <span id="auditStatusBadge"></span>
+        <button class="modal-close" onclick="closeAudit()">&times;</button>
+      </div>
+      <div class="modal-body" id="auditBody">
+        <div style="text-align:center;padding:40px;color:var(--neutral-400)">Loading account snapshot&hellip;</div>
+      </div>
+      <div class="action-bar">
+        <textarea id="auditNote" placeholder="Add note or reason&hellip;"></textarea>
+        <button class="toolbar" onclick="addNote()" style="padding:8px 14px;border:1px solid var(--neutral-200);border-radius:6px;background:var(--white);cursor:pointer;font-size:0.78rem">Add Note</button>
+        <button class="toolbar" onclick="setStatus('suspended')" style="padding:8px 14px;border:1px solid #f59e0b;border-radius:6px;background:#fef3c7;color:#92400e;cursor:pointer;font-size:0.78rem;font-weight:500">Suspend</button>
+        <button class="toolbar" onclick="setStatus('banned')" style="padding:8px 14px;border:1px solid #ef4444;border-radius:6px;background:#fee2e2;color:#991b1b;cursor:pointer;font-size:0.78rem;font-weight:500">Ban</button>
+        <button class="toolbar" onclick="setStatus('active')" style="padding:8px 14px;border:1px solid #10b981;border-radius:6px;background:#dcfce7;color:#166534;cursor:pointer;font-size:0.78rem;font-weight:500">Restore</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const SUPPORT_EMAIL = 'desk@incitat.io';
+    const ADMIN_EMAIL = 'admin@incitat.io';
     let allUsers = [];
     let allLogins = [];
+    let auditUserId = null;
 
     /* ── Helpers ──────────────────────────────────────────── */
 
@@ -179,24 +268,18 @@
       d.textContent = s ?? '';
       return d.innerHTML;
     }
-
-    function fmtNum(n) {
-      return (n ?? 0).toLocaleString();
-    }
-
+    function fmtNum(n) { return (n ?? 0).toLocaleString(); }
     function fmtBytes(b) {
       if (!b || b < 1024) return (b ?? 0) + ' B';
       if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
       if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
       return (b / 1073741824).toFixed(2) + ' GB';
     }
-
     function fmtDate(iso) {
       if (!iso) return '\u2014';
       const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
       return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     }
-
     function fmtRelative(iso) {
       if (!iso) return '\u2014';
       const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
@@ -210,29 +293,36 @@
       if (days < 7) return days + 'd ago';
       return fmtDate(iso);
     }
-
     function providerBadge(p) {
-      var cls = p === 'google' ? 'badge-google' : p === 'microsoft' ? 'badge-microsoft' : 'badge-default';
+      const cls = p === 'google' ? 'badge-google' : p === 'microsoft' ? 'badge-microsoft' : 'badge-default';
       return '<span class="badge ' + cls + '">' + esc(p) + '</span>';
     }
-
-    var PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+    function statusBadge(s) {
+      s = s || 'active';
+      const cls = s === 'active' ? 'badge-active' : s === 'suspended' ? 'badge-suspended' : 'badge-banned';
+      return '<span class="badge ' + cls + '">' + esc(s) + '</span>';
+    }
+    const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316'];
     function initialColor(name) {
-      var h = 0;
-      for (var i = 0; i < (name||'').length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+      let h = 0;
+      for (let i = 0; i < (name||'').length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
       return PALETTE[Math.abs(h) % PALETTE.length];
     }
-
-    function avatarHtml(u) {
+    function avatarHtml(u, large) {
+      if (large) {
+        if (u.avatar_url) return '<img class="avatar-lg" src="' + esc(u.avatar_url) + '" alt="">';
+        const init = (u.name || u.email || '?').charAt(0).toUpperCase();
+        return '<span class="avatar-initial-lg" style="background:' + initialColor(u.name||u.email) + '">' + init + '</span>';
+      }
       if (u.avatar_url) return '<img class="avatar" src="' + esc(u.avatar_url) + '" alt="" loading="lazy">';
-      var init = (u.name || u.email || '?').charAt(0).toUpperCase();
+      const init = (u.name || u.email || '?').charAt(0).toUpperCase();
       return '<span class="avatar-initial" style="background:' + initialColor(u.name||u.email) + '">' + init + '</span>';
     }
 
     /* ── Tabs ─────────────────────────────────────────────── */
 
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
       document.getElementById('tabUsers').classList.toggle('hidden', name !== 'users');
       document.getElementById('tabLogins').classList.toggle('hidden', name !== 'logins');
     }
@@ -241,9 +331,9 @@
 
     async function loadStats() {
       try {
-        var res = await fetch('/api/admin/stats');
+        const res = await fetch('/api/admin/stats');
         if (!res.ok) return;
-        var s = await res.json();
+        const s = await res.json();
         document.getElementById('statUsers').textContent = fmtNum(s.users);
         document.getElementById('statUsersDetail').textContent = '+' + s.signups7d + ' this week';
         document.getElementById('statTrips').textContent = fmtNum(s.trips);
@@ -254,36 +344,29 @@
         document.getElementById('statLogins7d').textContent = fmtNum(s.logins7d);
         document.getElementById('statLogins30d').textContent = fmtNum(s.logins30d) + ' in 30d';
         renderChart(s.loginsByDay || []);
-      } catch (err) {
-        console.error('Stats load error:', err);
-      }
+      } catch (err) { console.error('Stats load error:', err); }
     }
 
     function renderChart(data) {
-      var bars = document.getElementById('chartBars');
-      var labels = document.getElementById('chartLabels');
+      const bars = document.getElementById('chartBars');
+      const labels = document.getElementById('chartLabels');
       if (!data.length) { bars.innerHTML = '<span class="muted" style="margin:auto;font-size:0.8rem">No login data yet</span>'; return; }
-
-      // Fill gaps in the 30-day range
-      var dayMap = new Map(data.map(function(d) { return [d.day, d.count]; }));
-      var filled = [];
-      var now = new Date();
-      for (var i = 29; i >= 0; i--) {
-        var dt = new Date(now); dt.setDate(dt.getDate() - i);
-        var key = dt.toISOString().slice(0, 10);
+      const dayMap = new Map(data.map(d => [d.day, d.count]));
+      const filled = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const dt = new Date(now); dt.setDate(dt.getDate() - i);
+        const key = dt.toISOString().slice(0, 10);
         filled.push({ day: key, count: dayMap.get(key) || 0 });
       }
-
-      var max = Math.max.apply(null, filled.map(function(d) { return d.count; }).concat([1]));
-      bars.innerHTML = filled.map(function(d) {
-        var h = Math.max(2, (d.count / max) * 100);
-        var dayLabel = new Date(d.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        return '<div class="chart-bar" style="height:' + h + '%"><div class="tip">' + dayLabel + ': ' + d.count + '</div></div>';
+      const max = Math.max(...filled.map(d => d.count), 1);
+      bars.innerHTML = filled.map(d => {
+        const h = Math.max(2, (d.count / max) * 100);
+        const lbl = new Date(d.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return '<div class="chart-bar" style="height:' + h + '%"><div class="tip">' + lbl + ': ' + d.count + '</div></div>';
       }).join('');
-
-      // Show every 5th label
-      labels.innerHTML = filled.map(function(d, idx) {
-        var show = idx % 5 === 0 || idx === filled.length - 1;
+      labels.innerHTML = filled.map((d, i) => {
+        const show = i % 5 === 0 || i === filled.length - 1;
         return '<span>' + (show ? new Date(d.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '') + '</span>';
       }).join('');
     }
@@ -292,72 +375,73 @@
 
     async function loadUsers() {
       try {
-        var res = await fetch('/api/admin/users');
+        const res = await fetch('/api/admin/users');
         if (!res.ok) throw new Error('Request failed');
-        var data = await res.json();
+        const data = await res.json();
         allUsers = data.users || [];
         renderUsers(allUsers);
-      } catch (err) {
-        console.error('Users load error:', err);
-      }
+      } catch (err) { console.error('Users load error:', err); }
     }
 
     function renderUsers(list) {
-      var tbody = document.querySelector('#usersTable tbody');
+      const tbody = document.querySelector('#usersTable tbody');
       tbody.innerHTML = '';
-      list.forEach(function(u) {
-        var origIdx = allUsers.indexOf(u);
-        var tr = document.createElement('tr');
+      list.forEach(u => {
+        const origIdx = allUsers.indexOf(u);
+        const tr = document.createElement('tr');
         tr.dataset.index = origIdx;
         tr.innerHTML =
           '<td><input type="checkbox" class="user-check" data-index="' + origIdx + '" onchange="updateSelection()" /></td>' +
           '<td>' + avatarHtml(u) + esc(u.name || '\u2014') + '</td>' +
           '<td class="email-cell">' + esc(u.email) + '</td>' +
           '<td>' + providerBadge(u.provider) + '</td>' +
+          '<td>' + statusBadge(u.status) + '</td>' +
           '<td>' + (u.trip_count ?? 0) + '</td>' +
-          '<td>' + (u.identity_count ?? 1) + '</td>' +
           '<td class="muted" title="' + esc(u.created_at) + '">' + fmtDate(u.created_at) + '</td>' +
-          '<td class="muted" title="' + esc(u.last_login || u.updated_at) + '">' + fmtRelative(u.last_login || u.updated_at) + '</td>';
+          '<td class="muted" title="' + esc(u.last_login || u.updated_at) + '">' + fmtRelative(u.last_login || u.updated_at) + '</td>' +
+          '<td><button class="link-btn" onclick="openAudit(\'' + esc(u.id) + '\')">Audit</button></td>';
         tbody.appendChild(tr);
       });
     }
 
     function filterUsers() {
-      var q = document.getElementById('userSearch').value.toLowerCase().trim();
+      const q = document.getElementById('userSearch').value.toLowerCase().trim();
       if (!q) { renderUsers(allUsers); return; }
-      renderUsers(allUsers.filter(function(u) {
-        return (u.email||'').toLowerCase().includes(q) || (u.name||'').toLowerCase().includes(q);
-      }));
+      renderUsers(allUsers.filter(u =>
+        (u.email||'').toLowerCase().includes(q) || (u.name||'').toLowerCase().includes(q)
+      ));
     }
 
     /* ── Audit Log ────────────────────────────────────────── */
 
     async function loadLogins() {
       try {
-        var res = await fetch('/api/admin/logins');
+        const res = await fetch('/api/admin/logins');
         if (!res.ok) return;
-        var data = await res.json();
+        const data = await res.json();
         allLogins = data.events || [];
         renderLogins(allLogins);
         document.getElementById('loginCount').textContent = allLogins.length + ' events';
-      } catch (err) {
-        console.error('Logins load error:', err);
-      }
+      } catch (err) { console.error('Logins load error:', err); }
     }
 
     function renderLogins(list) {
-      var tbody = document.querySelector('#loginsTable tbody');
+      const tbody = document.querySelector('#loginsTable tbody');
       tbody.innerHTML = '';
-      list.forEach(function(e) {
-        var country = '', platform = '';
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No login events recorded yet. Events will appear after the next user login.</td></tr>';
+        return;
+      }
+      list.forEach(e => {
+        let country = '', platform = '';
         try {
-          var h = JSON.parse(e.client_hints || '{}');
+          const h = JSON.parse(e.client_hints || '{}');
           country = h.cfCountry || '';
           platform = (h.uaPlatform || '').replace(/"/g, '');
         } catch(_) {}
-        var ua = e.user_agent || '';
-        var uaShort = ua.length > 80 ? ua.slice(0, 80) + '\u2026' : ua;
-        var tr = document.createElement('tr');
+        const ua = e.user_agent || '';
+        const uaShort = ua.length > 80 ? ua.slice(0, 80) + '\u2026' : ua;
+        const tr = document.createElement('tr');
         tr.innerHTML =
           '<td class="muted" title="' + esc(e.created_at) + '">' + fmtRelative(e.created_at) + '</td>' +
           '<td class="email-cell">' + esc(e.email) + '</td>' +
@@ -371,53 +455,221 @@
     }
 
     function filterLogins() {
-      var q = document.getElementById('loginSearch').value.toLowerCase().trim();
+      const q = document.getElementById('loginSearch').value.toLowerCase().trim();
       if (!q) { renderLogins(allLogins); return; }
-      renderLogins(allLogins.filter(function(e) {
-        var hints = '';
-        try { var h = JSON.parse(e.client_hints || '{}'); hints = (h.cfCountry||'') + ' ' + (h.uaPlatform||''); } catch(_) {}
+      renderLogins(allLogins.filter(e => {
+        let hints = '';
+        try { const h = JSON.parse(e.client_hints || '{}'); hints = (h.cfCountry||'') + ' ' + (h.uaPlatform||''); } catch(_) {}
         return [e.email, e.ip, e.provider, hints, e.user_agent].join(' ').toLowerCase().includes(q);
       }));
+    }
+
+    /* ── Audit Modal ──────────────────────────────────────── */
+
+    async function openAudit(userId) {
+      auditUserId = userId;
+      document.getElementById('auditOverlay').classList.add('open');
+      document.getElementById('auditBody').innerHTML = '<div style="text-align:center;padding:40px;color:var(--neutral-400)">Loading account snapshot&hellip;</div>';
+      document.getElementById('auditAvatar').innerHTML = '';
+      document.getElementById('auditName').textContent = 'Loading\u2026';
+      document.getElementById('auditMeta').textContent = '';
+      document.getElementById('auditStatusBadge').innerHTML = '';
+      document.getElementById('auditNote').value = '';
+      document.body.style.overflow = 'hidden';
+
+      try {
+        const res = await fetch('/api/admin/users/' + userId + '/audit');
+        if (!res.ok) throw new Error('Failed to load audit data');
+        const data = await res.json();
+        renderAudit(data);
+      } catch (err) {
+        document.getElementById('auditBody').innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444">Error: ' + esc(err.message) + '</div>';
+      }
+    }
+
+    function closeAudit() {
+      document.getElementById('auditOverlay').classList.remove('open');
+      document.body.style.overflow = '';
+      auditUserId = null;
+    }
+
+    function renderAudit(data) {
+      const u = data.user;
+
+      // Header
+      document.getElementById('auditAvatar').innerHTML = avatarHtml(u, true);
+      document.getElementById('auditName').textContent = u.name || u.email;
+      document.getElementById('auditMeta').innerHTML = esc(u.email) + ' &middot; ' + providerBadge(u.provider) + ' &middot; Joined ' + fmtDate(u.created_at);
+      document.getElementById('auditStatusBadge').innerHTML = statusBadge(u.status);
+
+      let html = '';
+
+      // --- Content flags ---
+      html += '<section><h3>Content Scan</h3>';
+      if (data.flags.length === 0) {
+        html += '<div class="flag-clean">&#10003; No issues detected &mdash; all user content looks clean.</div>';
+      } else {
+        data.flags.forEach(f => {
+          html += '<div class="flag flag-' + f.severity + '"><span class="flag-category">' + esc(f.category) + '</span><span>' + esc(f.source) + ' &rarr; ' + esc(f.field) + ': ' + esc(f.snippet) + '</span></div>';
+        });
+      }
+      html += '</section>';
+
+      // --- Trips ---
+      html += '<section><h3>Trips (' + data.trips.length + ')</h3>';
+      if (!data.trips.length) { html += '<p class="muted">No trips.</p>'; }
+      else {
+        data.trips.forEach(t => {
+          const wpCount = data.waypoints.filter(w => w.trip_id === t.id).length;
+          const jCount = data.journals.filter(j => j.trip_id === t.id).length;
+          html += '<div class="trip-card"><div class="trip-name">' + esc(t.name) + (t.is_public ? ' <span class="badge badge-active">public</span>' : '') + '</div>';
+          html += '<div class="trip-meta">' + wpCount + ' waypoints &middot; ' + jCount + ' journal entries &middot; Created ' + fmtDate(t.created_at) + '</div>';
+          if (t.description) html += '<div class="trip-meta" style="color:var(--neutral-700)">' + esc(t.description.slice(0, 200)) + '</div>';
+          html += '</div>';
+        });
+      }
+      html += '</section>';
+
+      // --- Images ---
+      if (data.images.length) {
+        html += '<section><h3>Images (' + data.images.length + ')</h3>';
+        html += '<div class="img-grid">';
+        data.images.forEach(img => {
+          html += '<img src="' + esc(img.url) + '" alt="' + esc(img.name) + '" title="' + esc(img.name) + (img.caption ? ' \u2014 ' + esc(img.caption) : '') + '" onclick="window.open(this.src,\'_blank\')" />';
+        });
+        html += '</div></section>';
+      }
+
+      // --- Journal excerpts ---
+      const pubJournals = data.journals.filter(j => !j.is_private);
+      if (pubJournals.length) {
+        html += '<section><h3>Journal Excerpts (' + pubJournals.length + ')</h3>';
+        pubJournals.slice(0, 10).forEach(j => {
+          html += '<div class="note-item"><div class="note-meta">' + esc(j.title) + ' &middot; ' + fmtDate(j.created_at) + '</div>';
+          html += '<div class="note-text">' + esc((j.content || '').slice(0, 250)) + '</div></div>';
+        });
+        if (pubJournals.length > 10) html += '<p class="muted">' + (pubJournals.length - 10) + ' more entries not shown.</p>';
+        html += '</section>';
+      }
+
+      // --- Recent logins ---
+      html += '<section><h3>Recent Logins (' + data.logins.length + ')</h3>';
+      if (data.logins.length) {
+        html += '<div class="table-wrap"><table class="login-mini"><thead><tr><th>Time</th><th>Provider</th><th>IP</th><th>Country</th><th>Platform</th></tr></thead><tbody>';
+        data.logins.slice(0, 20).forEach(l => {
+          let country = '', platform = '';
+          try { const h = JSON.parse(l.client_hints || '{}'); country = h.cfCountry || ''; platform = (h.uaPlatform || '').replace(/"/g, ''); } catch(_) {}
+          html += '<tr><td class="muted">' + fmtRelative(l.created_at) + '</td><td>' + providerBadge(l.provider) + '</td><td class="mono">' + esc(l.ip) + '</td><td>' + (country || '\u2014') + '</td><td>' + (platform || '\u2014') + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+      } else {
+        html += '<p class="muted">No login events recorded for this user.</p>';
+      }
+      html += '</section>';
+
+      // --- Admin notes ---
+      html += '<section><h3>Admin Notes (' + data.notes.length + ')</h3>';
+      if (!data.notes.length) { html += '<p class="muted">No admin notes yet.</p>'; }
+      else {
+        data.notes.forEach(n => {
+          html += '<div class="note-item" data-action="' + esc(n.action) + '"><div class="note-meta">' + esc(n.action.toUpperCase()) + ' &middot; ' + esc(n.admin_email) + ' &middot; ' + fmtRelative(n.created_at) + '</div>';
+          html += '<div class="note-text">' + esc(n.content) + '</div></div>';
+        });
+      }
+      html += '</section>';
+
+      // --- Identities ---
+      if (data.identities.length > 1) {
+        html += '<section><h3>Linked Identities (' + data.identities.length + ')</h3>';
+        data.identities.forEach(id => {
+          html += '<div style="font-size:0.82rem;margin-bottom:4px">' + providerBadge(id.provider) + ' ' + esc(id.email) + ' <span class="muted">(linked ' + fmtDate(id.created_at) + ')</span></div>';
+        });
+        html += '</section>';
+      }
+
+      document.getElementById('auditBody').innerHTML = html;
+    }
+
+    /* ── Moderation Actions ───────────────────────────────── */
+
+    async function setStatus(newStatus) {
+      if (!auditUserId) return;
+      const reason = document.getElementById('auditNote').value.trim();
+      const labels = { suspended: 'SUSPEND', banned: 'BAN', active: 'RESTORE' };
+      if (!confirm('Are you sure you want to ' + labels[newStatus] + ' this user?' + (reason ? '\n\nReason: ' + reason : ''))) return;
+
+      try {
+        const res = await fetch('/api/admin/users/' + auditUserId + '/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus, reason: reason || undefined, adminEmail: ADMIN_EMAIL })
+        });
+        if (!res.ok) { const e = await res.json(); alert('Error: ' + (e.error || 'unknown')); return; }
+        document.getElementById('auditNote').value = '';
+        alert('User status updated to: ' + newStatus);
+        // Refresh audit view
+        openAudit(auditUserId);
+        loadUsers();
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    }
+
+    async function addNote() {
+      if (!auditUserId) return;
+      const content = document.getElementById('auditNote').value.trim();
+      if (!content) { alert('Please enter a note.'); return; }
+
+      try {
+        const res = await fetch('/api/admin/users/' + auditUserId + '/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, adminEmail: ADMIN_EMAIL })
+        });
+        if (!res.ok) { const e = await res.json(); alert('Error: ' + (e.error || 'unknown')); return; }
+        document.getElementById('auditNote').value = '';
+        openAudit(auditUserId);
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
     }
 
     /* ── Selection / Email ────────────────────────────────── */
 
     function getChecked() {
-      return Array.from(document.querySelectorAll('.user-check:checked')).map(function(cb) { return Number(cb.dataset.index); });
+      return Array.from(document.querySelectorAll('.user-check:checked')).map(cb => Number(cb.dataset.index));
     }
-
     function updateSelection() {
-      var indices = getChecked();
+      const indices = getChecked();
       document.getElementById('selCount').textContent = indices.length + ' selected';
-      document.querySelectorAll('#usersTable tbody tr').forEach(function(tr) {
-        var cb = tr.querySelector('.user-check');
+      document.querySelectorAll('#usersTable tbody tr').forEach(tr => {
+        const cb = tr.querySelector('.user-check');
         tr.classList.toggle('selected', cb ? cb.checked : false);
       });
-      var total = document.querySelectorAll('.user-check').length;
+      const total = document.querySelectorAll('.user-check').length;
       document.getElementById('checkAll').checked = indices.length === total && total > 0;
     }
-
     function toggleSelectAll(checked) {
-      document.querySelectorAll('.user-check').forEach(function(cb) { cb.checked = !!checked; });
+      document.querySelectorAll('.user-check').forEach(cb => { cb.checked = !!checked; });
       document.getElementById('checkAll').checked = !!checked;
       updateSelection();
     }
-
     function composeEmail() {
-      var indices = getChecked();
+      const indices = getChecked();
       if (!indices.length) { alert('Select at least one user.'); return; }
-      openMailto(indices.map(function(i) { return allUsers[i] ? allUsers[i].email : null; }).filter(Boolean));
+      openMailto(indices.map(i => allUsers[i]?.email).filter(Boolean));
     }
-
     function composeEmailAll() {
-      var emails = allUsers.map(function(u) { return u.email; }).filter(Boolean);
+      const emails = allUsers.map(u => u.email).filter(Boolean);
       if (!emails.length) { alert('No users loaded.'); return; }
       openMailto(emails);
     }
-
     function openMailto(bccList) {
       window.location.href = 'mailto:' + SUPPORT_EMAIL + '?bcc=' + encodeURIComponent(bccList.join(',')) + '&subject=' + encodeURIComponent('Ride \u2014 ');
     }
+
+    // Close modal on Escape
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAudit(); });
 
     /* ── Init ─────────────────────────────────────────────── */
 

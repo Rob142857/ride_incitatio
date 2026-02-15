@@ -144,7 +144,20 @@ export async function requireAuth(context) {
     
     // Attach user to context
     context.user = sessionData.user;
-    
+
+    // Check if user is banned or suspended
+    try {
+      const row = await env.RIDE_TRIP_PLANNER_DB.prepare(
+        'SELECT status FROM users WHERE id = ?'
+      ).bind(sessionData.user.id).first();
+      if (row && row.status === 'banned') {
+        return errorResponse('Account has been suspended. Contact support.', 403);
+      }
+      if (row && row.status === 'suspended') {
+        return errorResponse('Account temporarily suspended. Contact support.', 403);
+      }
+    } catch (_) { /* status column may not exist yet */ }
+
     // Continue to next handler (return nothing)
     return;
   } catch (error) {

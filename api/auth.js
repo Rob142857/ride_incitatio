@@ -202,10 +202,12 @@ export const AuthHandler = {
       avatar_url: user.avatar_url
     });
 
-    // Lightweight audit log
-    recordLogin(env, user, providerName, request).catch((err) => {
-      console.error('login audit failed', err);
-    });
+    // Lightweight audit log — use waitUntil so it finishes even after response
+    context.ctx.waitUntil(
+      recordLogin(env, user, providerName, request).catch((err) => {
+        console.error('login audit failed', err);
+      })
+    );
     
     // Redirect to app with session cookie (Response.redirect requires absolute URL)
     const returnPath = stateData.returnUrl || '/';
@@ -307,7 +309,7 @@ export const AuthHandler = {
     const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      `SELECT u.id, u.email, u.name, u.avatar_url, u.provider, u.provider_id, u.created_at, u.updated_at, u.last_login,
+      `SELECT u.id, u.email, u.name, u.avatar_url, u.provider, u.provider_id, u.status, u.created_at, u.updated_at, u.last_login,
               (SELECT COUNT(*) FROM trips t WHERE t.user_id = u.id) AS trip_count,
               (SELECT COUNT(*) FROM auth_identities ai WHERE ai.user_id = u.id) AS identity_count
        FROM users u ORDER BY u.created_at DESC`
@@ -317,18 +319,194 @@ export const AuthHandler = {
   },
 
   /**
-   * Admin: recent login events (protected by requireAdmin middleware)
+   * Admin: recent login events
    */
   async listLoginsAdmin(context) {
     const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id, user_id, email, provider, ip, user_agent, client_hints, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'
+      'SELECT id, user_id, email, provider, ip, user_agent, client_hints, created_at FROM login_events ORDER BY created_at DESC LIMIT 200'
     ).all();
 
     return jsonResponse({ events: result.results || [] });
-  }
+  },
+
+  /**
+   * Admin: full account audit snapshot
+   * Returns user profile, all trips (with waypoints, journal, attachments),
+   * admin notes, login history, and automated content flags.
+   */
+  async auditUser(context) {
+    const { env, params } = context;
+    const userId = params.id;
+    const db = env.RIDE_TRIP_PLANNER_DB;
+
+    // Fetch user
+    const user = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+    if (!user) return errorResponse('User not found', 404);
+
+    // Parallel fetch everything
+    const [trips, waypoints, journals, attachments, identities, logins, notes] = await Promise.all([
+      db.prepare('SELECT id, name, description, public_title, public_description, public_contact, is_public, cover_image_url, created_at, updated_at FROM trips WHERE user_id = ?').bind(userId).all(),
+      db.prepare('SELECT w.id, w.trip_id, w.name, w.address, w.notes FROM waypoints w JOIN trips t ON w.trip_id = t.id WHERE t.user_id = ?').bind(userId).all(),
+      db.prepare('SELECT j.id, j.trip_id, j.title, j.content, j.tags, j.is_private, j.created_at FROM journal_entries j JOIN trips t ON j.trip_id = t.id WHERE t.user_id = ?').bind(userId).all(),
+      db.prepare('SELECT a.id, a.trip_id, a.filename, a.original_name, a.mime_type, a.size_bytes, a.storage_key, a.is_cover, a.caption, a.created_at FROM attachments a JOIN trips t ON a.trip_id = t.id WHERE t.user_id = ?').bind(userId).all(),
+      db.prepare('SELECT id, provider, provider_id, email, created_at, last_login FROM auth_identities WHERE user_id = ?').bind(userId).all(),
+      db.prepare('SELECT email, provider, ip, user_agent, client_hints, created_at FROM login_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(userId).all(),
+      db.prepare('SELECT id, admin_email, action, content, created_at FROM admin_notes WHERE user_id = ? ORDER BY created_at DESC').bind(userId).all(),
+    ]);
+
+    // Automated content scan
+    const flags = scanContent({
+      user,
+      trips: trips.results || [],
+      waypoints: waypoints.results || [],
+      journals: journals.results || [],
+      attachments: attachments.results || [],
+    });
+
+    // Build attachment URLs for image preview
+    const images = (attachments.results || []).filter(a => a.mime_type && a.mime_type.startsWith('image/')).map(a => ({
+      id: a.id,
+      name: a.original_name,
+      url: '/api/attachments/' + a.id,
+      size: a.size_bytes,
+      caption: a.caption,
+      isCover: !!a.is_cover,
+    }));
+
+    return jsonResponse({
+      user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url, provider: user.provider, status: user.status || 'active', created_at: user.created_at, last_login: user.last_login },
+      trips: trips.results || [],
+      waypoints: waypoints.results || [],
+      journals: journals.results || [],
+      images,
+      identities: identities.results || [],
+      logins: logins.results || [],
+      notes: notes.results || [],
+      flags,
+    });
+  },
+
+  /**
+   * Admin: update user status (active / suspended / banned)
+   */
+  async setUserStatus(context) {
+    const { env, params, request } = context;
+    const userId = params.id;
+    const body = await request.json();
+    const { status, reason, adminEmail } = body;
+
+    if (!['active', 'suspended', 'banned'].includes(status)) {
+      return errorResponse('Invalid status. Must be active, suspended, or banned.', 400);
+    }
+
+    const db = env.RIDE_TRIP_PLANNER_DB;
+    const user = await db.prepare('SELECT id, email, status FROM users WHERE id = ?').bind(userId).first();
+    if (!user) return errorResponse('User not found', 404);
+
+    // Update status
+    await db.prepare('UPDATE users SET status = ?, updated_at = datetime("now") WHERE id = ?').bind(status, userId).run();
+
+    // Record admin note
+    const noteId = generateId();
+    const actionLabel = status === 'active' ? 'restore' : status;
+    await db.prepare(
+      'INSERT INTO admin_notes (id, user_id, admin_email, action, content, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(noteId, userId, adminEmail || 'admin', actionLabel, reason || `Status changed to ${status}`).run();
+
+    // If banning/suspending, revoke all sessions
+    if (status !== 'active') {
+      try {
+        const registryKey = `sessions:${userId}`;
+        const raw = await env.RIDE_TRIP_PLANNER_SESSIONS.get(registryKey, 'json');
+        if (Array.isArray(raw)) {
+          await Promise.all(raw.map(s => env.RIDE_TRIP_PLANNER_SESSIONS.delete(s.token)));
+          await env.RIDE_TRIP_PLANNER_SESSIONS.delete(registryKey);
+        }
+      } catch (_) { /* best effort */ }
+    }
+
+    return jsonResponse({ ok: true, status, userId });
+  },
+
+  /**
+   * Admin: add a note to a user's record
+   */
+  async addAdminNote(context) {
+    const { env, params, request } = context;
+    const userId = params.id;
+    const body = await request.json();
+    const { content, adminEmail } = body;
+    if (!content) return errorResponse('Note content is required', 400);
+
+    const db = env.RIDE_TRIP_PLANNER_DB;
+    const user = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+    if (!user) return errorResponse('User not found', 404);
+
+    const noteId = generateId();
+    await db.prepare(
+      'INSERT INTO admin_notes (id, user_id, admin_email, action, content, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(noteId, userId, adminEmail || 'admin', 'note', content).run();
+
+    return jsonResponse({ ok: true, id: noteId });
+  },
 };
+
+/* ── Content analysis ────────────────────────────────────── */
+
+const PROPRIETARY_PATTERNS = /\u00a9|\u00ae|\u2122|\btrademark\b|\bpatent\b|\bcopyrighted\b|\ball rights reserved\b|\bconfidential\b|\bproprietary\b/i;
+const SPAM_PATTERNS = /\b(buy now|click here|free money|act now|limited offer|subscribe|unsubscribe|\$\$\$)\b/i;
+const IMPERSONATION_PATTERNS = /\b(official|verified|admin|support team|customer service|helpdesk)\b/i;
+const OFFENSIVE_PATTERNS = /\b(hate|kill|threat|bomb|attack|terror)\b/i;
+const URL_PATTERN = /https?:\/\/[^\s]{20,}/gi;
+
+function scanContent({ user, trips, waypoints, journals, attachments }) {
+  const flags = [];
+
+  // Collect all text fields
+  function check(source, field, text) {
+    if (!text) return;
+    if (PROPRIETARY_PATTERNS.test(text)) flags.push({ severity: 'warning', category: 'proprietary', source, field, snippet: text.slice(0, 120) });
+    if (SPAM_PATTERNS.test(text)) flags.push({ severity: 'info', category: 'spam', source, field, snippet: text.slice(0, 120) });
+    if (IMPERSONATION_PATTERNS.test(text)) flags.push({ severity: 'warning', category: 'impersonation', source, field, snippet: text.slice(0, 120) });
+    if (OFFENSIVE_PATTERNS.test(text)) flags.push({ severity: 'alert', category: 'offensive', source, field, snippet: text.slice(0, 120) });
+    const urls = text.match(URL_PATTERN);
+    if (urls && urls.length > 2) flags.push({ severity: 'info', category: 'link-heavy', source, field, snippet: urls.slice(0, 3).join(', ') });
+  }
+
+  // User profile
+  check('profile', 'name', user.name);
+
+  // Trips
+  for (const t of trips) {
+    check(`trip:${t.id}`, 'name', t.name);
+    check(`trip:${t.id}`, 'description', t.description);
+    check(`trip:${t.id}`, 'public_title', t.public_title);
+    check(`trip:${t.id}`, 'public_description', t.public_description);
+    check(`trip:${t.id}`, 'public_contact', t.public_contact);
+  }
+
+  // Waypoints
+  for (const w of waypoints) {
+    check(`waypoint:${w.id}`, 'name', w.name);
+    check(`waypoint:${w.id}`, 'notes', w.notes);
+  }
+
+  // Journal entries
+  for (const j of journals) {
+    check(`journal:${j.id}`, 'title', j.title);
+    check(`journal:${j.id}`, 'content', j.content);
+  }
+
+  // Attachment filenames / captions
+  for (const a of attachments) {
+    check(`attachment:${a.id}`, 'original_name', a.original_name);
+    check(`attachment:${a.id}`, 'caption', a.caption);
+  }
+
+  return flags;
+}
 
 async function recordLogin(env, user, provider, request) {
   const ip = request.headers.get('cf-connecting-ip')
