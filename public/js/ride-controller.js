@@ -4,9 +4,6 @@
  */
 Object.assign(App, {
   bindRideControls() {
-    document.getElementById('rideInfoBtn')?.addEventListener('click', () => {
-      document.getElementById('rideStatsPanel')?.classList.toggle('hidden');
-    });
     document.getElementById('rideAddBtn')?.addEventListener('click', () => {
       document.getElementById('rideAddSheet')?.classList.remove('hidden');
     });
@@ -43,6 +40,7 @@ Object.assign(App, {
     this.isRiding = true;
     this.rideVisitedWaypoints = new Set();
     this.rideRerouting = false;
+    this.rideInitialRouted = false;     // first-fix reroute flag
     this.offRouteCounter = 0;
     this.lastRerouteAt = 0;
     document.getElementById('rideOverlay')?.classList.remove('hidden');
@@ -110,6 +108,30 @@ Object.assign(App, {
 
   onRidePosition(pos) {
     if (!this.isRiding || !this.currentTrip?.route?.coordinates || !this.currentTrip.route._cumulative) return;
+
+    // On first GPS fix, check if we're far from the route.
+    // If so, reroute from current position → all waypoints for immediate guidance.
+    if (!this.rideInitialRouted) {
+      this.rideInitialRouted = true;
+      const coords = this.currentTrip.route.coordinates;
+      let nearestDist = Infinity;
+      for (let i = 0; i < coords.length; i++) {
+        const d = this.haversine(coords[i], pos);
+        if (d < nearestDist) nearestDist = d;
+      }
+      if (nearestDist > 200) {
+        // Rider is distant — reroute from current position through all waypoints
+        const allWaypoints = [...(this.currentTrip.waypoints || [])].sort((a, b) => a.order - b.order);
+        if (allWaypoints.length) {
+          UI.showToast('Routing to your first waypoint…', 'info');
+          this.rideRerouting = true;
+          this.lastRerouteAt = Date.now();
+          MapManager.rerouteFromPosition(pos, allWaypoints);
+          return;   // wait for reroute to finish before normal tracking
+        }
+      }
+    }
+
     const coords = this.currentTrip.route.coordinates;
     const cumulative = this.currentTrip.route._cumulative;
     const total = this.currentTrip.route._total || cumulative[cumulative.length - 1] || 0;

@@ -231,11 +231,16 @@ const UI = {
     const openMenu = () => {
       sideMenu.classList.remove('hidden');
       menuOverlay.classList.remove('hidden');
+      document.body.classList.remove('sidebar-collapsed');
     };
 
     const closeMenuFn = () => {
       sideMenu.classList.add('hidden');
       menuOverlay.classList.add('hidden');
+      // On desktop, mark body so layout shifts
+      if (window.innerWidth >= 768) {
+        document.body.classList.add('sidebar-collapsed');
+      }
     };
 
     menuBtn.addEventListener('click', openMenu);

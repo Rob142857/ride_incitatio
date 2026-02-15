@@ -133,32 +133,43 @@
     </aside>
     <div id="menuOverlay" class="hidden"></div>
 
+    <!-- PWA Install Banner -->
+    <div id="installBanner" class="install-banner hidden">
+      <div class="install-banner-content">
+        <img src="/icons/icon-192.png" alt="Ride" class="install-banner-icon">
+        <div class="install-banner-text">
+          <strong>Install Ride</strong>
+          <span>Add to your homescreen for the best experience</span>
+        </div>
+      </div>
+      <div class="install-banner-actions">
+        <button id="installDismiss" class="install-btn-dismiss">Not now</button>
+        <button id="installAccept" class="install-btn-accept">Install</button>
+      </div>
+    </div>
+
     <!-- Ride Overlay -->
     <section id="rideOverlay" class="ride-overlay hidden">
-      <!-- Compact top banner: next turn only -->
+      <!-- Top banner: next turn + key stats -->
       <div class="ride-banner-minimal">
         <div class="ride-banner-content">
           <div class="ride-next-main" id="rideNextInstruction">Ready to ride</div>
           <div class="ride-next-meta" id="rideNextMeta">Waiting for GPS...</div>
+          <div class="ride-banner-stats">
+            <span id="rideDistanceRemaining">—</span>
+            <span class="ride-banner-sep">·</span>
+            <span id="rideStops">—</span> stops
+            <span class="ride-banner-sep">·</span>
+            <span id="rideEta">—</span>
+          </div>
         </div>
         <button id="rideBannerExitBtn" class="ride-banner-exit" aria-label="Exit ride">✕</button>
       </div>
+      <!-- Hidden elements for backward compat -->
+      <span id="rideTripName" class="hidden"></span>
 
-      <!-- Collapsible stats panel (hidden by default) -->
-      <div id="rideStatsPanel" class="ride-stats-panel hidden">
-        <div class="ride-stats-row">
-          <div class="ride-stat-mini"><span class="ride-stat-label">Remaining</span><span class="ride-stat-value" id="rideDistanceRemaining">—</span></div>
-          <div class="ride-stat-mini"><span class="ride-stat-label">Stops</span><span class="ride-stat-value" id="rideStops">—</span></div>
-          <div class="ride-stat-mini"><span class="ride-stat-label">ETA</span><span class="ride-stat-value" id="rideEta">—</span></div>
-        </div>
-        <div class="ride-stats-row">
-          <div class="ride-stat-mini full"><span class="ride-stat-label">Trip</span><span class="ride-stat-value" id="rideTripName">Ride</span></div>
-        </div>
-      </div>
-
-      <!-- Bottom-right floating action buttons -->
+      <!-- Bottom centered action buttons -->
       <div class="ride-fab-group">
-        <button id="rideInfoBtn" class="ride-fab" aria-label="Trip info">ℹ️</button>
         <button id="rideAddBtn" class="ride-fab" aria-label="Add note or photo">➕</button>
         <button id="rideRecenterBtn" class="ride-fab" aria-label="Recenter">📍</button>
         <button id="rideExitBtn" class="ride-fab ride-fab-exit" aria-label="Exit ride">✕</button>
@@ -543,7 +554,7 @@
   <script src="js/journal-controller.js"></script>
   <script src="js/ride-controller.js"></script>
   
-  <!-- Service Worker Registration & Live Update Listener -->
+  <!-- Service Worker Registration, Live Update & PWA Install -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js')
@@ -554,13 +565,49 @@
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'ride:update') {
           console.log('[App] New build detected:', event.data.build);
-          // Brief toast, then seamless reload
           if (typeof UI !== 'undefined' && UI.showToast) {
             UI.showToast('Updating…', 'info');
           }
           setTimeout(() => location.reload(), 600);
         }
       });
+    }
+
+    // ── PWA Install Prompt ──────────────────────────────────────────
+    let deferredInstallPrompt = null;
+    const installBanner = document.getElementById('installBanner');
+    const installAccept = document.getElementById('installAccept');
+    const installDismiss = document.getElementById('installDismiss');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      // Don't re-show if user dismissed recently (24h cooldown)
+      const dismissed = localStorage.getItem('ride_install_dismissed');
+      if (dismissed && Date.now() - Number(dismissed) < 24 * 60 * 60 * 1000) return;
+      // Show after a short delay so the app feels loaded first
+      setTimeout(() => installBanner?.classList.remove('hidden'), 2000);
+    });
+
+    installAccept?.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      installBanner?.classList.add('hidden');
+      deferredInstallPrompt.prompt();
+      const result = await deferredInstallPrompt.userChoice;
+      console.log('[PWA] Install:', result.outcome);
+      deferredInstallPrompt = null;
+    });
+
+    installDismiss?.addEventListener('click', () => {
+      installBanner?.classList.add('hidden');
+      deferredInstallPrompt = null;
+      localStorage.setItem('ride_install_dismissed', Date.now().toString());
+    });
+
+    // Hide banner if app is already installed (standalone mode)
+    if (window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone) {
+      installBanner?.classList.add('hidden');
     }
   </script>
 </body>

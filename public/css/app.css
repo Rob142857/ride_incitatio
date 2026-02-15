@@ -393,6 +393,93 @@ body.doc-page {
 .status.success { color: #34d399; }
 .status.error { color: #f87171; }
 
+/* ── PWA Install Banner ─────────────────────────────────────────────── */
+.install-banner {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-area-bottom) + 12px);
+  left: 12px;
+  right: 12px;
+  max-width: 400px;
+  margin: 0 auto;
+  z-index: 300;
+  background: rgba(14, 16, 28, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: installSlideUp 0.4s var(--ease-smooth);
+}
+
+@keyframes installSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.install-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.install-banner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.install-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.install-banner-text strong {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.install-banner-text span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.install-banner-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.install-btn-dismiss {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.install-btn-accept {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.install-btn-accept:active {
+  transform: scale(0.97);
+}
+
 body.ride-mode {
   overflow: hidden;
 }
@@ -436,6 +523,11 @@ body.ride-mode .panel-title {
 
 body.ride-mode .locate-btn {
   display: none;
+}
+
+/* Hide zoom controls in ride mode — rider doesn't need them */
+body.ride-mode .leaflet-control-zoom {
+  display: none !important;
 }
 
 /* Override Leaflet styles for dark theme */
@@ -686,6 +778,19 @@ body.ride-mode .locate-btn {
   color: rgba(255,255,255,0.8);
 }
 
+.ride-banner-stats {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.02em;
+}
+
+.ride-banner-sep {
+  margin: 0 4px;
+  opacity: 0.5;
+}
+
 .ride-banner-exit {
   flex-shrink: 0;
   width: 32px;
@@ -705,68 +810,17 @@ body.ride-mode .locate-btn {
   background: rgba(255,255,255,0.25);
 }
 
-/* Collapsible stats panel */
-.ride-stats-panel {
-  position: absolute;
-  bottom: calc(var(--safe-area-bottom) + 80px);
-  right: 12px;
-  width: 200px;
-  padding: 12px;
-  background: rgba(0,0,0,0.75);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: var(--radius-card);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
+/* (ride stats are now inline in the banner) */
 
-.ride-stats-panel.hidden {
-  display: none;
-}
-
-.ride-stats-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.ride-stats-row:last-child {
-  margin-bottom: 0;
-}
-
-.ride-stat-mini {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ride-stat-mini.full {
-  flex: 1 1 100%;
-}
-
-.ride-stat-mini .ride-stat-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: rgba(255,255,255,0.6);
-}
-
-.ride-stat-mini .ride-stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-}
-
-/* FAB group bottom-right */
+/* FAB group — centered at bottom */
 .ride-fab-group {
   position: absolute;
   bottom: calc(var(--safe-area-bottom) + 16px);
-  left: 12px;
-  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 12px;
 }
 
 .ride-fab {
@@ -2646,40 +2700,53 @@ body.ride-mode .locate-btn {
 
 /* ===== DESKTOP: sidebar always visible ===== */
 @media (min-width: 768px) {
-  /* Sidebar: always visible on desktop — override .hidden */
-  #sideMenu,
-  #sideMenu.hidden {
+  /* Sidebar: visible by default on desktop, collapsible */
+  #sideMenu {
     display: flex !important;
     transform: translateX(0) !important;
     box-shadow: none;
     z-index: 90;
   }
 
+  #sideMenu.hidden {
+    transform: translateX(-100%) !important;
+  }
+
   #sideMenu .menu-header #closeMenu {
-    display: none;
+    display: flex;
   }
 
-  /* Hide hamburger on desktop */
+  /* Keep hamburger visible for re-opening */
   .menu-toggle {
-    display: none !important;
+    display: flex !important;
   }
 
-  /* Hide overlay on desktop */
+  /* Hide overlay on desktop (sidebar doesn't need it) */
   #menuOverlay {
     display: none !important;
   }
 
-  /* Shift everything right of sidebar */
+  /* Shift everything right of sidebar when open */
   #topBar {
     left: var(--sidebar-width);
+    transition: left 0.35s var(--ease-smooth);
   }
 
   #bottomNav {
     left: var(--sidebar-width);
+    transition: left 0.35s var(--ease-smooth);
   }
 
   #map {
     left: var(--sidebar-width);
+    transition: left 0.35s var(--ease-smooth);
+  }
+
+  /* When sidebar is collapsed, reset left offsets */
+  body.sidebar-collapsed #topBar,
+  body.sidebar-collapsed #bottomNav,
+  body.sidebar-collapsed #map {
+    left: 0;
   }
 
   .panel {
