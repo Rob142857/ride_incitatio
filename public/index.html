@@ -78,8 +78,8 @@
         <div id="tripStats" class="trip-stats"></div>
       </div>
       <div class="topbar-right">
-        <button id="rideBtn" class="icon-btn" aria-label="Ride">
-          <svg viewBox="0 0 24 24"><path d="M5 4a2 2 0 114 0 2 2 0 01-4 0zm6.5 8.5L9 10 7 12v5h2v-3.5l1.5 1.5v5h2v-5l1.5-1.5V17h2v-5l-2-2-2.5 3.5zM17 4h2l-2.5 6H13l-1.5-3-1.5 3H7L4.5 4h2l1.5 4h1L10 5h2l1 3h1l1.5-4z"/></svg>
+        <button id="rideBtn" class="icon-btn" aria-label="Start navigation">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
         </button>
         <button id="shareBtn" class="icon-btn" aria-label="Share">
           <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
@@ -132,32 +132,6 @@
       </div>
     </aside>
     <div id="menuOverlay" class="hidden"></div>
-
-    <!-- About Modal -->
-    <div id="aboutModal" class="modal hidden">
-      <div class="modal-content about-modal">
-        <div class="modal-header">
-          <h3>About Ride</h3>
-          <button type="button" class="modal-close" data-close aria-label="Close">×</button>
-        </div>
-        <p class="modal-subtitle">Built by a rider and traveler so you can plan, collaborate, and share clean trips—with optional journaling for the record.</p>
-        <div class="about-meta">
-          <div><strong>Cartography & GeoData</strong><br>Self-hosted OSRM routing (prod), Leaflet front-end, dark basemap. Demo may use public OSRM while we stand up our Cloudflare-hosted stack.</div>
-          <div><strong>Stack</strong><br>Vanilla JS PWA, Leaflet maps, Cloudflare Worker API, D1 storage, KV sessions, R2 attachments.</div>
-          <div><strong>Credits</strong><br>Robert Evans  82 Objective Artefacts. Base map data: <a href="https://www.openstreetmap.org/about" target="_blank" rel="noopener">OpenStreetMap contributors</a>. Routing engine: <a href="https://project-osrm.org/" target="_blank" rel="noopener">Project OSRM</a> (<a href="https://project-osrm.org/docs/v5.24.0/api/#" target="_blank" rel="noopener">API docs</a>).</div>
-          <div><strong>Source</strong><br><a href="https://github.com/Rob142857/ride_incitatio" target="_blank" rel="noopener">GitHub Repository</a></div>
-        </div>
-        <div class="about-links">
-          <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
-          <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>
-          <a href="deletion.html" target="_blank" rel="noopener">Data Deletion</a>
-          <a href="https://ko-fi.com/objectiveartefacts" target="_blank" rel="noopener">Buy me a coffee</a>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="primary-btn" data-close>Close</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Ride Overlay -->
     <section id="rideOverlay" class="ride-overlay hidden">

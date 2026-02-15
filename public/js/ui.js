@@ -266,7 +266,7 @@ const UI = {
 
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closeMenuFn();
-      this.openModal('aboutModal');
+      window.open('/about.html', '_blank');
     });
   },
 
