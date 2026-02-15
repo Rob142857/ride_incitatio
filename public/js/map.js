@@ -4,6 +4,9 @@
 const MapManager = {
   map: null,
   routingControl: null,
+
+  // Self-hosted OSRM routing endpoint (Cloudflare Tunnel → Docker)
+  OSRM_SERVICE_URL: 'https://maps.incitat.io/route/v1',
   waypointMarkers: {},
   isAddingWaypoint: false,
   pendingLocation: null,
@@ -126,6 +129,7 @@ const MapManager = {
 
     this.routingControl = L.Routing.control({
       waypoints: ordered,
+      serviceUrl: this.OSRM_SERVICE_URL,
       routeWhileDragging: false,
       showAlternatives: false,
       addWaypoints: false,
@@ -456,6 +460,7 @@ const MapManager = {
     // Create routing control
     this.routingControl = L.Routing.control({
       waypoints: routeWaypoints,
+      serviceUrl: this.OSRM_SERVICE_URL,
       routeWhileDragging: true,
       showAlternatives: false,
       addWaypoints: true, // Allow adding waypoints by clicking on route

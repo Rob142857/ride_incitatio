@@ -1,6 +1,6 @@
 /**
  * OAuth Authentication Handler
- * Supports Google, Facebook, and Microsoft SSO
+ * Supports Google and Microsoft SSO
  * Domain: ride.incitat.io
  */
 
@@ -19,21 +19,6 @@ const PROVIDERS = {
       email: data.email,
       name: data.name,
       avatar_url: data.picture,
-      provider_id: data.id
-    })
-  },
-  
-  facebook: {
-    authUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
-    tokenUrl: 'https://graph.facebook.com/v21.0/oauth/access_token',
-    userUrl: 'https://graph.facebook.com/me?fields=id,name,email,picture.type(large)',
-    scopes: ['email', 'public_profile'],
-    getClientId: (env) => env.FACEBOOK_APP_ID,
-    getClientSecret: (env) => env.FACEBOOK_APP_SECRET,
-    parseUser: (data) => ({
-      email: data.email,
-      name: data.name,
-      avatar_url: data.picture?.data?.url,
       provider_id: data.id
     })
   },
@@ -76,10 +61,21 @@ export const AuthHandler = {
     const state = crypto.randomUUID();
     
     // Store state in KV temporarily (5 minutes)
-    // Validate return URL — must be relative path to prevent open redirect
+    // Validate return URL — extract path from same-origin URLs, reject foreign origins
     let returnUrl = url.searchParams.get('return') || '/';
-    if (!returnUrl.startsWith('/') || returnUrl.startsWith('//') || returnUrl.includes('://')) {
-      returnUrl = '/';
+    try {
+      const parsed = new URL(returnUrl, BASE_URL);
+      // Only allow same-origin return URLs
+      if (parsed.origin === new URL(BASE_URL).origin) {
+        returnUrl = parsed.pathname + parsed.search + parsed.hash;
+      } else {
+        returnUrl = '/';
+      }
+    } catch {
+      // If URL parsing fails, ensure it's a safe relative path
+      if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+        returnUrl = '/';
+      }
     }
     await env.RIDE_TRIP_PLANNER_SESSIONS.put(`oauth_state_${state}`, JSON.stringify({
       provider: providerName,
@@ -211,9 +207,10 @@ export const AuthHandler = {
       console.error('login audit failed', err);
     });
     
-    // Redirect to app with session cookie
-    const returnUrl = stateData.returnUrl || '/';
-    const response = Response.redirect(returnUrl, 302);
+    // Redirect to app with session cookie (Response.redirect requires absolute URL)
+    const returnPath = stateData.returnUrl || '/';
+    const absoluteReturnUrl = returnPath.startsWith('http') ? returnPath : `${BASE_URL}${returnPath}`;
+    const response = Response.redirect(absoluteReturnUrl, 302);
     
     return setSessionCookie(response, session.token, session.expiresAt);
   },

@@ -83,11 +83,11 @@ const CSP = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://ride.incitat.io https://lh3.googleusercontent.com https://*.fbcdn.net https://*.microsoft.com",
-  "connect-src 'self' https://ride.incitat.io https://router.project-osrm.org https://nominatim.openstreetmap.org",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://ride.incitat.io https://lh3.googleusercontent.com https://*.microsoft.com",
+  "connect-src 'self' https://ride.incitat.io https://maps.incitat.io https://router.project-osrm.org https://nominatim.openstreetmap.org",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://accounts.google.com https://www.facebook.com https://login.microsoftonline.com"
+  "form-action 'self' https://accounts.google.com https://login.microsoftonline.com"
 ].join('; ');
 
 /**

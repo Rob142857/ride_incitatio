@@ -1122,16 +1122,6 @@ body.ride-mode .locate-btn {
   background: linear-gradient(135deg, #ffffff 0%, #ebeff7 100%);
 }
 
-.login-btn.facebook {
-  background: linear-gradient(135deg, #1c4eda 0%, #153fb3 100%);
-  color: white;
-  border-color: transparent;
-}
-
-.login-btn.facebook svg {
-  fill: white;
-}
-
 .login-btn.microsoft {
   background: linear-gradient(135deg, #202020 0%, #141414 100%);
   color: white;
