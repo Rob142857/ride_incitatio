@@ -193,20 +193,57 @@ export async function optionalAuth(context) {
 }
 
 /**
- * Create session token and store in KV
+ * Max concurrent sessions per user. When exceeded, the oldest session is evicted.
+ * Cloudflare KV TTL handles cleanup of expired entries automatically.
+ */
+const MAX_SESSIONS_PER_USER = 10;
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+/**
+ * Create session token, store in KV, and register it in the per-user session list.
+ * Multiple sessions (e.g. desktop + mobile) are fully supported; the list is
+ * capped at MAX_SESSIONS_PER_USER to prevent unbounded KV growth.
  */
 export async function createSession(env, user) {
   // 256-bit CSPRNG session token
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
-  const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
+  const expiresAt = Date.now() + (SESSION_TTL_SECONDS * 1000);
   
   await env.RIDE_TRIP_PLANNER_SESSIONS.put(token, JSON.stringify({
     user,
     expiresAt
   }), {
-    expirationTtl: 30 * 24 * 60 * 60 // 30 days in seconds
+    expirationTtl: SESSION_TTL_SECONDS
   });
-  
+
+  // Track active sessions per user (KV key: sessions:{userId})
+  // This allows us to cap sessions and provides a "revoke all" path.
+  const registryKey = `sessions:${user.id}`;
+  try {
+    const raw = await env.RIDE_TRIP_PLANNER_SESSIONS.get(registryKey, 'json');
+    let sessions = Array.isArray(raw) ? raw : [];
+
+    // Prune expired entries
+    const now = Date.now();
+    sessions = sessions.filter(s => s.expiresAt > now);
+
+    // Add the new session
+    sessions.push({ token, expiresAt });
+
+    // If over the cap, evict the oldest sessions
+    if (sessions.length > MAX_SESSIONS_PER_USER) {
+      const evicted = sessions.splice(0, sessions.length - MAX_SESSIONS_PER_USER);
+      // Delete the evicted session tokens from KV (fire-and-forget)
+      await Promise.allSettled(evicted.map(s => env.RIDE_TRIP_PLANNER_SESSIONS.delete(s.token)));
+    }
+
+    await env.RIDE_TRIP_PLANNER_SESSIONS.put(registryKey, JSON.stringify(sessions), {
+      expirationTtl: SESSION_TTL_SECONDS
+    });
+  } catch (_) {
+    // Non-critical — session still works, just no registry tracking
+  }
+
   return { token, expiresAt };
 }
 

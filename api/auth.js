@@ -233,8 +233,29 @@ export const AuthHandler = {
     const match = cookies.match(/ride_session=([^;]+)/);
     
     if (match) {
+      const token = match[1];
+
+      // Read session to get user ID for registry cleanup
+      try {
+        const sessionData = await env.RIDE_TRIP_PLANNER_SESSIONS.get(token, 'json');
+        if (sessionData?.user?.id) {
+          const registryKey = `sessions:${sessionData.user.id}`;
+          const raw = await env.RIDE_TRIP_PLANNER_SESSIONS.get(registryKey, 'json');
+          if (Array.isArray(raw)) {
+            const filtered = raw.filter(s => s.token !== token);
+            if (filtered.length > 0) {
+              await env.RIDE_TRIP_PLANNER_SESSIONS.put(registryKey, JSON.stringify(filtered), {
+                expirationTtl: 30 * 24 * 60 * 60
+              });
+            } else {
+              await env.RIDE_TRIP_PLANNER_SESSIONS.delete(registryKey);
+            }
+          }
+        }
+      } catch (_) { /* non-critical */ }
+
       // Delete session from KV
-      await env.RIDE_TRIP_PLANNER_SESSIONS.delete(match[1]);
+      await env.RIDE_TRIP_PLANNER_SESSIONS.delete(token);
     }
     
     const response = jsonResponse({ success: true });
