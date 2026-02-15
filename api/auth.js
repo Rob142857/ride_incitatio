@@ -263,13 +263,54 @@ export const AuthHandler = {
   },
 
   /**
-   * Admin: list users (protected by requireAdmin middleware)
+   * Admin: dashboard stats
+   */
+  async adminStats(context) {
+    const { env } = context;
+    const db = env.RIDE_TRIP_PLANNER_DB;
+
+    // Run all stat queries in parallel
+    const [users, trips, waypoints, journals, attachments, providers, signups7d, signups30d, logins7d, logins30d, loginsByDay] = await Promise.all([
+      db.prepare('SELECT COUNT(*) AS c FROM users').first(),
+      db.prepare('SELECT COUNT(*) AS c FROM trips').first(),
+      db.prepare('SELECT COUNT(*) AS c FROM waypoints').first(),
+      db.prepare('SELECT COUNT(*) AS c FROM journal_entries').first(),
+      db.prepare('SELECT COALESCE(COUNT(*),0) AS c, COALESCE(SUM(size_bytes),0) AS bytes FROM attachments').first(),
+      db.prepare("SELECT provider, COUNT(*) AS c FROM users GROUP BY provider ORDER BY c DESC").all(),
+      db.prepare("SELECT COUNT(*) AS c FROM users WHERE created_at >= datetime('now','-7 days')").first(),
+      db.prepare("SELECT COUNT(*) AS c FROM users WHERE created_at >= datetime('now','-30 days')").first(),
+      db.prepare("SELECT COUNT(*) AS c FROM login_events WHERE created_at >= datetime('now','-7 days')").first(),
+      db.prepare("SELECT COUNT(*) AS c FROM login_events WHERE created_at >= datetime('now','-30 days')").first(),
+      db.prepare("SELECT date(created_at) AS day, COUNT(*) AS c FROM login_events WHERE created_at >= datetime('now','-30 days') GROUP BY day ORDER BY day").all(),
+    ]);
+
+    return jsonResponse({
+      users: users.c,
+      trips: trips.c,
+      waypoints: waypoints.c,
+      journals: journals.c,
+      attachments: attachments.c,
+      storageBytes: attachments.bytes,
+      providers: (providers.results || []).map(r => ({ provider: r.provider, count: r.c })),
+      signups7d: signups7d.c,
+      signups30d: signups30d.c,
+      logins7d: logins7d.c,
+      logins30d: logins30d.c,
+      loginsByDay: (loginsByDay.results || []).map(r => ({ day: r.day, count: r.c })),
+    });
+  },
+
+  /**
+   * Admin: list users with trip counts
    */
   async listUsersAdmin(context) {
     const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id, email, name, provider, provider_id, created_at, updated_at, last_login FROM users ORDER BY created_at DESC'
+      `SELECT u.id, u.email, u.name, u.avatar_url, u.provider, u.provider_id, u.created_at, u.updated_at, u.last_login,
+              (SELECT COUNT(*) FROM trips t WHERE t.user_id = u.id) AS trip_count,
+              (SELECT COUNT(*) FROM auth_identities ai WHERE ai.user_id = u.id) AS identity_count
+       FROM users u ORDER BY u.created_at DESC`
     ).all();
 
     return jsonResponse({ users: result.results || [] });
