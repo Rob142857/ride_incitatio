@@ -24,8 +24,8 @@ const PROVIDERS = {
   },
   
   facebook: {
-    authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
-    tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
+    authUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v21.0/oauth/access_token',
     userUrl: 'https://graph.facebook.com/me?fields=id,name,email,picture.type(large)',
     scopes: ['email', 'public_profile'],
     getClientId: (env) => env.FACEBOOK_APP_ID,
@@ -73,12 +73,17 @@ export const AuthHandler = {
     }
     
     // Generate state for CSRF protection
-    const state = generateId();
+    const state = crypto.randomUUID();
     
     // Store state in KV temporarily (5 minutes)
+    // Validate return URL — must be relative path to prevent open redirect
+    let returnUrl = url.searchParams.get('return') || '/';
+    if (!returnUrl.startsWith('/') || returnUrl.startsWith('//') || returnUrl.includes('://')) {
+      returnUrl = '/';
+    }
     await env.RIDE_TRIP_PLANNER_SESSIONS.put(`oauth_state_${state}`, JSON.stringify({
       provider: providerName,
-      returnUrl: url.searchParams.get('return') || '/'
+      returnUrl
     }), { expirationTtl: 300 });
     
     // Build redirect URL - use BASE_URL in production for consistency
@@ -136,8 +141,9 @@ export const AuthHandler = {
     }
     await env.RIDE_TRIP_PLANNER_SESSIONS.delete(`oauth_state_${state}`);
     
-    // Exchange code for token
-    const redirectUri = `${url.origin}/api/auth/callback/${providerName}`;
+    // Exchange code for token — use BASE_URL for consistent redirect_uri
+    const origin = env.ENVIRONMENT === 'production' ? BASE_URL : url.origin;
+    const redirectUri = `${origin}/api/auth/callback/${providerName}`;
     
     const tokenParams = new URLSearchParams({
       client_id: provider.getClientId(env),
@@ -239,18 +245,10 @@ export const AuthHandler = {
   },
 
   /**
-   * Admin: list users (to be Zero Trust protected upstream)
+   * Admin: list users (protected by requireAdmin middleware)
    */
   async listUsersAdmin(context) {
-    const { env, request } = context;
-
-    // Optional header gate if ADMIN_KEY is set
-    if (env.ADMIN_KEY) {
-      const provided = request.headers.get('x-admin-key');
-      if (!provided || provided !== env.ADMIN_KEY) {
-        return errorResponse('Unauthorized', 401);
-      }
-    }
+    const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, email, name, provider, provider_id, created_at, updated_at, last_login FROM users ORDER BY created_at DESC'
@@ -260,17 +258,10 @@ export const AuthHandler = {
   },
 
   /**
-   * Admin: recent login events (lightweight audit)
+   * Admin: recent login events (protected by requireAdmin middleware)
    */
   async listLoginsAdmin(context) {
-    const { env, request } = context;
-
-    if (env.ADMIN_KEY) {
-      const provided = request.headers.get('x-admin-key');
-      if (!provided || provided !== env.ADMIN_KEY) {
-        return errorResponse('Unauthorized', 401);
-      }
-    }
+    const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
       'SELECT id, user_id, email, provider, ip, user_agent, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'

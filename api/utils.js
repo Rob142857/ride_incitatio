@@ -41,10 +41,10 @@ export function errorResponse(message, status = 400) {
 }
 
 /**
- * Generate unique ID
+ * Generate unique ID (CSPRNG)
  */
 export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return crypto.randomUUID();
 }
 
 /**
@@ -196,7 +196,8 @@ export async function optionalAuth(context) {
  * Create session token and store in KV
  */
 export async function createSession(env, user) {
-  const token = generateId() + generateId(); // Longer token
+  // 256-bit CSPRNG session token
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
   const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
   
   await env.RIDE_TRIP_PLANNER_SESSIONS.put(token, JSON.stringify({
@@ -221,6 +222,25 @@ export function setSessionCookie(response, token, expiresAt) {
     status: response.status,
     headers
   });
+}
+
+/**
+ * Admin authentication middleware - requires ADMIN_KEY env var
+ */
+export async function requireAdmin(context) {
+  const { env, request } = context;
+
+  if (!env.ADMIN_KEY) {
+    return errorResponse('Admin access not configured', 403);
+  }
+
+  const provided = request.headers.get('x-admin-key');
+  if (!provided || provided !== env.ADMIN_KEY) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  // Continue to next handler
+  return;
 }
 
 /**

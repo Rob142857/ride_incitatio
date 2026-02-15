@@ -7,8 +7,13 @@
 import { Router } from './router.js';
 import { AuthHandler } from './auth.js';
 import { TripsHandler } from './trips.js';
+import { WaypointsHandler } from './waypoints.js';
+import { JournalHandler } from './journal.js';
+import { AttachmentsHandler } from './attachments.js';
+import { ShareHandler } from './share.js';
+import { AccountHandler } from './account.js';
 import { PlacesHandler } from './places.js';
-import { cors, jsonResponse, errorResponse, requireAuth, optionalAuth, BASE_URL } from './utils.js';
+import { cors, jsonResponse, errorResponse, requireAuth, requireAdmin, optionalAuth, BASE_URL } from './utils.js';
 
 const router = new Router();
 
@@ -20,8 +25,8 @@ router.get('/api/auth/login/:provider', AuthHandler.initiateLogin);
 router.get('/api/auth/callback/:provider', AuthHandler.handleCallback);
 router.get('/api/auth/me', requireAuth, AuthHandler.getCurrentUser);
 router.post('/api/auth/logout', AuthHandler.logout);
-router.get('/api/admin/users', AuthHandler.listUsersAdmin);
-router.get('/api/admin/logins', AuthHandler.listLoginsAdmin);
+router.get('/api/admin/users', requireAdmin, AuthHandler.listUsersAdmin);
+router.get('/api/admin/logins', requireAdmin, AuthHandler.listLoginsAdmin);
 
 // Trip routes (protected)
 router.get('/api/trips', requireAuth, TripsHandler.listTrips);
@@ -31,33 +36,33 @@ router.put('/api/trips/:id', requireAuth, TripsHandler.updateTrip);
 router.delete('/api/trips/:id', requireAuth, TripsHandler.deleteTrip);
 
 // Waypoint routes (protected)
-router.post('/api/trips/:tripId/waypoints', requireAuth, TripsHandler.addWaypoint);
-router.put('/api/trips/:tripId/waypoints/:id', requireAuth, TripsHandler.updateWaypoint);
-router.delete('/api/trips/:tripId/waypoints/:id', requireAuth, TripsHandler.deleteWaypoint);
-router.put('/api/trips/:tripId/waypoints/reorder', requireAuth, TripsHandler.reorderWaypoints);
+router.post('/api/trips/:tripId/waypoints', requireAuth, WaypointsHandler.addWaypoint);
+router.put('/api/trips/:tripId/waypoints/:id', requireAuth, WaypointsHandler.updateWaypoint);
+router.delete('/api/trips/:tripId/waypoints/:id', requireAuth, WaypointsHandler.deleteWaypoint);
+router.put('/api/trips/:tripId/waypoints/reorder', requireAuth, WaypointsHandler.reorderWaypoints);
 
 // Places search (protected to limit API key exposure)
 router.get('/api/places/search', requireAuth, PlacesHandler.search);
 
 // Journal routes (protected)
-router.post('/api/trips/:tripId/journal', requireAuth, TripsHandler.addJournalEntry);
-router.put('/api/trips/:tripId/journal/:id', requireAuth, TripsHandler.updateJournalEntry);
-router.delete('/api/trips/:tripId/journal/:id', requireAuth, TripsHandler.deleteJournalEntry);
+router.post('/api/trips/:tripId/journal', requireAuth, JournalHandler.addJournalEntry);
+router.put('/api/trips/:tripId/journal/:id', requireAuth, JournalHandler.updateJournalEntry);
+router.delete('/api/trips/:tripId/journal/:id', requireAuth, JournalHandler.deleteJournalEntry);
 
 // Attachment routes (protected for upload/modify, public for viewing public attachments)
-router.post('/api/trips/:tripId/attachments', requireAuth, TripsHandler.uploadAttachment);
-router.get('/api/attachments/:id', optionalAuth, TripsHandler.getAttachment);
-router.put('/api/attachments/:id', requireAuth, TripsHandler.updateAttachment);
-router.delete('/api/attachments/:id', requireAuth, TripsHandler.deleteAttachment);
+router.post('/api/trips/:tripId/attachments', requireAuth, AttachmentsHandler.uploadAttachment);
+router.get('/api/attachments/:id', optionalAuth, AttachmentsHandler.getAttachment);
+router.put('/api/attachments/:id', requireAuth, AttachmentsHandler.updateAttachment);
+router.delete('/api/attachments/:id', requireAuth, AttachmentsHandler.deleteAttachment);
 
 // Account/data routes
-router.post('/api/user/purge', requireAuth, TripsHandler.deleteAllUserData);
+router.post('/api/user/purge', requireAuth, AccountHandler.deleteAllUserData);
 
 // Share routes 
-router.post('/api/trips/:id/share', requireAuth, TripsHandler.generateShareLink);
+router.post('/api/trips/:id/share', requireAuth, ShareHandler.generateShareLink);
 
 // Short URL public trip API: /api/s/abc123 -> trip JSON data
-router.get('/api/s/:shortCode', TripsHandler.getSharedTrip);
+router.get('/api/s/:shortCode', ShareHandler.getSharedTrip);
 
 // Deploy sanity-check endpoint (no auth)
 // Bump DEPLOY_MARKER when you want to verify a new deploy via curl.
@@ -71,6 +76,33 @@ router.all('/api/*', () => errorResponse('Not found', 404));
 
 // Regex for valid 6-char short codes (alphanumeric only)
 const SHORT_CODE_REGEX = /^\/([a-zA-Z0-9]{6})$/;
+
+// Content Security Policy for HTML responses
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://ride.incitat.io https://lh3.googleusercontent.com https://*.fbcdn.net https://*.microsoft.com",
+  "connect-src 'self' https://ride.incitat.io https://router.project-osrm.org https://nominatim.openstreetmap.org",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https://accounts.google.com https://www.facebook.com https://login.microsoftonline.com"
+].join('; ');
+
+/**
+ * Add security headers to HTML responses
+ */
+function addSecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set('Content-Security-Policy', CSP);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=()');
+  headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -103,7 +135,8 @@ export default {
           // Valid short code - serve the trip page, passing short code as query param
           const newUrl = new URL('/trip.html', url.origin);
           newUrl.searchParams.set('trip', shortCode);
-          return env.ASSETS.fetch(new Request(newUrl, request));
+          const resp = await env.ASSETS.fetch(new Request(newUrl, request));
+          return addSecurityHeaders(resp);
         }
       } catch (error) {
         console.error('Short code lookup error:', error);
@@ -124,7 +157,12 @@ export default {
       return Response.redirect(`${BASE_URL}/${shortCode}`, 301);
     }
     
-    // For all other routes, let Pages handle static files
-    return env.ASSETS.fetch(request);
+    // For all other routes, let Pages handle static files (add security headers to HTML)
+    const response = await env.ASSETS.fetch(request);
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('text/html')) {
+      return addSecurityHeaders(response);
+    }
+    return response;
   }
 };

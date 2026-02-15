@@ -112,20 +112,8 @@ const MapManager = {
     });
   },
 
-  haversineLatLng(a, b) {
-    const toRad = (v) => v * Math.PI / 180;
-    const R = 6371000;
-    const latA = (a && (a.lat ?? a[0])) ?? 0;
-    const lngA = (a && (a.lng ?? a[1])) ?? 0;
-    const latB = (b && (b.lat ?? b[0])) ?? 0;
-    const lngB = (b && (b.lng ?? b[1])) ?? 0;
-    const dLat = toRad(latB - latA);
-    const dLng = toRad(lngB - lngA);
-    const lat1 = toRad(latA);
-    const lat2 = toRad(latB);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h));
-  },
+  /** Delegate to shared utility */
+  haversineLatLng(a, b) { return RideUtils.haversine(a, b); },
 
   rerouteFromPosition(startPos, remainingWaypoints = []) {
     const startLatLng = L.latLng(startPos.lat, startPos.lng);
