@@ -22,7 +22,6 @@ const STATIC_ASSETS = [
   '/css/app.css',
   '/css/global.css',
   '/js/api.js',
-  '/js/app.js',
   '/js/app-core.js',
   '/js/auth-controller.js',
   '/js/trip-controller.js',

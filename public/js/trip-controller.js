@@ -128,11 +128,6 @@ Object.assign(App, {
     if (trip.waypoints?.length > 0) MapManager.fitToWaypoints(trip.waypoints);
   },
 
-  loadTripDataIfCurrent(trip) {
-    const normalized = this.normalizeTrip(trip);
-    if (this.currentTrip?.id === normalized?.id) this.loadTripData(normalized);
-  },
-
   attachJournalAttachments(trip) {
     if (!trip) return;
     const attachments = Array.isArray(trip.attachments) ? trip.attachments : [];
@@ -561,7 +556,4 @@ Object.assign(App, {
     }
   },
 
-  generateTripLink() {
-    // Auto-generation now handled during save when public
-  }
 });

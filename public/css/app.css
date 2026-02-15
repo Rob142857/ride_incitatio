@@ -1,33 +1,10 @@
-/* Public/Private Toggle Styles */
-.trip-public-toggle, .share-public-toggle {
-  margin-top: 8px;
-}
+/* Public Toggle Label */
 .public-toggle-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
-}
-.public-toggle-checkbox {
-  accent-color: #3b82f6;
-  width: 16px;
-  height: 16px;
-}
-/* Share Modal Checkbox Alignment */
-.share-checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.share-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 400;
   cursor: pointer;
 }
 /* CSS Variables */
@@ -342,19 +319,6 @@ body.doc-page {
 .doc-card a:hover {
   color: #ffffff;
   border-color: #ffffff;
-}
-
-.doc-section {
-  margin-top: 24px;
-}
-
-.doc-callout {
-  margin-top: 20px;
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-secondary);
 }
 
 .confirm-input {
@@ -1606,15 +1570,6 @@ body.ride-mode .leaflet-control-zoom {
   }
 }
 
-@keyframes modalFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /* Allow map click-through while picking a waypoint */
 .map-pick-mode .modal:not(.hidden) {
   pointer-events: none;
@@ -2698,21 +2653,6 @@ body.ride-mode .leaflet-control-zoom {
   line-height: 1.6;
   max-width: 260px;
   margin: 0 auto;
-}
-
-/* Draggable */
-.sortable-ghost {
-  opacity: 0.4;
-}
-
-.drag-handle {
-  cursor: grab;
-  padding: 8px;
-  color: var(--text-muted);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
 }
 
 /* Hidden utility */

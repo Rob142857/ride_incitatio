@@ -60,22 +60,6 @@ const Trip = {
   },
 
   /**
-   * Create a journal entry
-   */
-  createJournalEntry(data) {
-    return {
-      id: Storage.generateId(),
-      title: data.title || 'Note',
-      content: data.content || '',
-      isPrivate: data.isPrivate || false,
-      tags: data.tags || [],
-      attachments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-  },
-
-  /**
    * Add waypoint to trip
    */
   addWaypoint(trip, waypointData) {
@@ -142,33 +126,6 @@ const Trip = {
   },
 
   /**
-   * Add journal entry to trip
-   */
-  addJournalEntry(trip, entryData) {
-    const entry = this.createJournalEntry(entryData);
-    trip.journal.push(entry);
-    trip.updatedAt = new Date().toISOString();
-    return entry;
-  },
-
-  /**
-   * Update journal entry
-   */
-  updateJournalEntry(trip, entryId, data) {
-    const index = trip.journal.findIndex(e => e.id === entryId);
-    if (index >= 0) {
-      trip.journal[index] = {
-        ...trip.journal[index],
-        ...data,
-        updatedAt: new Date().toISOString()
-      };
-      trip.updatedAt = new Date().toISOString();
-      return trip.journal[index];
-    }
-    return null;
-  },
-
-  /**
    * Remove journal entry
    */
   removeJournalEntry(trip, entryId) {
@@ -181,14 +138,6 @@ const Trip = {
    */
   getPublicJournal(trip) {
     return trip.journal.filter(e => !e.isPrivate);
-  },
-
-  /**
-   * Set custom route points (for drag-to-adjust functionality)
-   */
-  setCustomRoutePoints(trip, points) {
-    trip.customRoutePoints = points;
-    trip.updatedAt = new Date().toISOString();
   },
 
   /**

@@ -239,7 +239,8 @@ const App = {
     try {
       let sharedData;
       if (this.useCloud) {
-        sharedData = await API.shared.get(shareId);
+        const res = await API.request(`/s/${shareId}`);
+        sharedData = res.trip || res;
       } else {
         sharedData = Share.loadSharedTrip(shareId);
       }

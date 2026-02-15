@@ -290,23 +290,6 @@ const Share = {
     return null;
   },
 
-  /**
-   * Generate embeddable URL for notes apps
-   */
-  getEmbedUrl(trip) {
-    const shareId = trip.shareId || trip.shortCode || trip.share_id || trip.short_code;
-    if (!shareId) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?trip=${shareId}&embed=true`;
-  },
-
-  /**
-   * Generate markdown link for notes apps
-   */
-  getMarkdownLink(trip) {
-    const url = this.getEmbedUrl(trip);
-    return `[${trip.name}](${url})`;
-  }
 };
 
 // Make available globally
