@@ -345,4 +345,19 @@ const API = {
       });
     },
   },
+
+  // Places search (Google Places via backend proxy)
+  places: {
+    async search(query, options = {}) {
+      const params = new URLSearchParams({ q: query });
+      if (options.lat != null && options.lng != null) {
+        params.set('lat', options.lat);
+        params.set('lng', options.lng);
+      }
+      if (options.radius) params.set('radius', options.radius);
+      if (options.region) params.set('region', options.region);
+      const data = await API.request(`/places/search?${params}`);
+      return data.results || [];
+    },
+  },
 };
