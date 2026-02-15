@@ -235,7 +235,13 @@ export async function requireAdmin(context) {
   }
 
   const provided = request.headers.get('x-admin-key');
-  if (!provided || provided !== env.ADMIN_KEY) {
+  if (!provided) return errorResponse('Unauthorized', 401);
+
+  // Constant-time comparison to prevent timing side-channel attacks
+  const enc = new TextEncoder();
+  const a = enc.encode(provided);
+  const b = enc.encode(env.ADMIN_KEY);
+  if (a.byteLength !== b.byteLength || !crypto.subtle.timingSafeEqual(a, b)) {
     return errorResponse('Unauthorized', 401);
   }
 

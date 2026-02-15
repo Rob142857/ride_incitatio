@@ -444,7 +444,8 @@ Object.assign(App, {
     grid.innerHTML = images.map(img => {
       const url = img.url || `/api/attachments/${img.id}`;
       const isCover = img.isCover || img.is_cover || currentCoverUrl.includes(img.id);
-      return `<div class="cover-picker-thumb${isCover ? ' is-cover' : ''}" data-attachment-id="${img.id}" data-url="${url}" title="${img.originalName || img.original_name || 'Photo'}">
+      const safeName = (img.originalName || img.original_name || 'Photo').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      return `<div class="cover-picker-thumb${isCover ? ' is-cover' : ''}" data-attachment-id="${img.id}" data-url="${url}" title="${safeName}">
         <img src="${url}" alt="" loading="lazy">
         ${isCover ? '<span class="cover-badge">Cover</span>' : ''}
       </div>`;

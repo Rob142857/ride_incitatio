@@ -5,109 +5,238 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ride Admin</title>
   <link rel="stylesheet" href="/css/global.css" />
-  <link rel="stylesheet" href="/css/app.css" />
   <style>
-    body { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
-    h1 { margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
-    th { color: var(--text-secondary); font-weight: 600; }
-    tbody tr:hover { background: rgba(255,255,255,0.03); }
-    .badge { padding: 2px 8px; border-radius: var(--radius-btn); background: var(--bg-tertiary); font-size: 12px; }
-    .muted { color: var(--text-secondary); }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { max-width: 1200px; margin: 0 auto; padding: 32px 20px; font-family: var(--font-sans); color: var(--neutral-900); background: var(--neutral-50); }
+    h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 4px; }
+    h2 { font-size: 1.1rem; font-weight: 600; margin: 32px 0 4px; }
+    .subtitle { color: var(--neutral-500); font-size: 0.85rem; margin: 0 0 16px; }
+    .hidden { display: none !important; }
+
+    /* Auth gate */
+    #authGate { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
+    #authGate input { flex: 1; max-width: 340px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-btn); font-family: var(--font-mono); font-size: 0.85rem; }
+    #authGate button { padding: 8px 16px; border: none; border-radius: var(--radius-btn); background: var(--accent); color: var(--white); cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+    #authGate button:hover { opacity: 0.85; }
+    #status { color: var(--neutral-500); font-size: 0.85rem; margin-bottom: 12px; }
+
+    /* Toolbar */
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .toolbar button { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-btn); background: var(--white); cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: background var(--transition-fast); }
+    .toolbar button:hover { background: var(--neutral-100); }
+    .toolbar button.primary { background: var(--accent); color: var(--white); border-color: var(--accent); }
+    .toolbar button.primary:hover { opacity: 0.85; }
+    .toolbar .spacer { flex: 1; }
+    .toolbar .count { font-size: 0.8rem; color: var(--neutral-500); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--neutral-200); text-align: left; white-space: nowrap; }
+    th { color: var(--neutral-500); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; background: var(--neutral-50); }
+    tbody tr { transition: background var(--transition-fast); }
+    tbody tr:hover { background: var(--neutral-100); }
+    tbody tr.selected { background: rgba(17, 24, 39, 0.06); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-btn); background: var(--neutral-200); font-size: 0.75rem; font-weight: 500; }
+    .muted { color: var(--neutral-500); }
+    td.email-cell { font-weight: 500; }
+    input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>Ride Admin</h1>
-  <p class="muted">Zero Trust should sit in front of this page. Lists users across providers.</p>
-  <div id="status" class="muted">Loading...</div>
-  <table id="usersTable" class="hidden">
-    <thead>
-      <tr>
-        <th>Email</th>
-        <th>Name</th>
-        <th>Provider</th>
-        <th>Provider ID</th>
-        <th>Created</th>
-        <th>Last Login</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <p class="subtitle">User management and audit log &middot; desk@incitat.io</p>
 
-  <h2 style="margin-top:32px">Recent Logins</h2>
-  <p class="muted">Lightweight audit (last 100 events).</p>
-  <table id="loginsTable" class="hidden">
-    <thead>
-      <tr>
-        <th>Email</th>
-        <th>Provider</th>
-        <th>IP</th>
-        <th>User Agent</th>
-        <th>When</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div id="authGate">
+    <input type="password" id="adminKey" placeholder="Admin API key" autocomplete="off" />
+    <button onclick="authenticate()">Connect</button>
+  </div>
+  <div id="status"></div>
+
+  <!-- Users section -->
+  <div id="usersSection" class="hidden">
+    <h2>Users</h2>
+    <div class="toolbar">
+      <button onclick="toggleSelectAll()">Select All</button>
+      <button onclick="deselectAll()">Deselect</button>
+      <span class="spacer"></span>
+      <span class="count" id="selCount">0 selected</span>
+      <button class="primary" onclick="composeEmail()">✉ Email Selected</button>
+      <button class="primary" onclick="composeEmailAll()">✉ Email All</button>
+    </div>
+    <div class="table-wrap">
+      <table id="usersTable">
+        <thead>
+          <tr>
+            <th style="width:30px"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this.checked)" /></th>
+            <th>Email</th>
+            <th>Name</th>
+            <th>Provider</th>
+            <th>Created</th>
+            <th>Last Login</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Recent logins -->
+    <h2>Recent Logins</h2>
+    <p class="subtitle">Last 100 login events — lightweight audit trail.</p>
+    <div class="table-wrap">
+      <table id="loginsTable">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Provider</th>
+            <th>IP</th>
+            <th>Country</th>
+            <th>User Agent</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
 
   <script>
+    const SUPPORT_EMAIL = 'desk@incitat.io';
+    let adminKey = '';
+    let allUsers = [];
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    function authenticate() {
+      adminKey = document.getElementById('adminKey').value.trim();
+      if (!adminKey) return;
+      document.getElementById('authGate').classList.add('hidden');
+      document.getElementById('status').textContent = 'Loading…';
+      loadUsers();
+      loadLogins();
+    }
+
+    // Allow Enter key to authenticate
+    document.getElementById('adminKey').addEventListener('keydown', e => {
+      if (e.key === 'Enter') authenticate();
+    });
+
+    function headers() {
+      return { 'x-admin-key': adminKey };
+    }
+
     async function loadUsers() {
       const status = document.getElementById('status');
-      const table = document.getElementById('usersTable');
       try {
-        const res = await fetch('/api/admin/users', { credentials: 'include' });
+        const res = await fetch('/api/admin/users', { headers: headers() });
+        if (res.status === 401) { status.textContent = 'Invalid admin key.'; document.getElementById('authGate').classList.remove('hidden'); return; }
         if (!res.ok) throw new Error('Request failed');
         const data = await res.json();
-        const tbody = table.querySelector('tbody');
+        allUsers = data.users || [];
+
+        const tbody = document.querySelector('#usersTable tbody');
         tbody.innerHTML = '';
-        (data.users || []).forEach(u => {
+        allUsers.forEach((u, i) => {
           const tr = document.createElement('tr');
+          tr.dataset.index = i;
           tr.innerHTML = `
-            <td>${u.email || ''}</td>
-            <td>${u.name || ''}</td>
-            <td><span class="badge">${u.provider || ''}</span></td>
-            <td class="muted">${u.provider_id || ''}</td>
-            <td class="muted">${u.created_at || ''}</td>
-            <td class="muted">${u.last_login || u.updated_at || ''}</td>
+            <td><input type="checkbox" class="user-check" data-index="${i}" onchange="updateSelection()" /></td>
+            <td class="email-cell">${esc(u.email)}</td>
+            <td>${esc(u.name)}</td>
+            <td><span class="badge">${esc(u.provider)}</span></td>
+            <td class="muted">${esc(u.created_at?.slice(0, 10))}</td>
+            <td class="muted">${esc(u.last_login?.slice(0, 16) || u.updated_at?.slice(0, 16) || '—')}</td>
           `;
           tbody.appendChild(tr);
         });
-        status.textContent = `Loaded ${data.users?.length || 0} users`;
-        table.classList.remove('hidden');
+
+        status.textContent = `${allUsers.length} user${allUsers.length === 1 ? '' : 's'}`;
+        document.getElementById('usersSection').classList.remove('hidden');
       } catch (err) {
-        status.textContent = 'Failed to load users';
+        status.textContent = 'Failed to load users.';
         console.error(err);
       }
     }
 
     async function loadLogins() {
-      const table = document.getElementById('loginsTable');
       try {
-        const res = await fetch('/api/admin/logins', { credentials: 'include' });
-        if (!res.ok) throw new Error('Request failed');
+        const res = await fetch('/api/admin/logins', { headers: headers() });
+        if (!res.ok) return;
         const data = await res.json();
-        const tbody = table.querySelector('tbody');
+        const tbody = document.querySelector('#loginsTable tbody');
         tbody.innerHTML = '';
         (data.events || []).forEach(e => {
+          let country = '';
+          try { const h = JSON.parse(e.client_hints || '{}'); country = h.cfCountry || ''; } catch(_) {}
+          const ua = (e.user_agent || '').slice(0, 100);
           const tr = document.createElement('tr');
-          const ua = (e.user_agent || '').slice(0, 120);
           tr.innerHTML = `
-            <td>${e.email || ''}</td>
-            <td><span class="badge">${e.provider || ''}</span></td>
-            <td class="muted">${e.ip || ''}</td>
-            <td class="muted" title="${e.user_agent || ''}">${ua}</td>
-            <td class="muted">${e.created_at || ''}</td>
+            <td class="email-cell">${esc(e.email)}</td>
+            <td><span class="badge">${esc(e.provider)}</span></td>
+            <td class="muted">${esc(e.ip)}</td>
+            <td class="muted">${esc(country)}</td>
+            <td class="muted" title="${esc(e.user_agent)}">${esc(ua)}</td>
+            <td class="muted">${esc(e.created_at?.slice(0, 16))}</td>
           `;
           tbody.appendChild(tr);
         });
-        table.classList.remove('hidden');
       } catch (err) {
         console.error(err);
       }
     }
 
-    loadUsers();
-    loadLogins();
+    /* Selection helpers */
+    function getChecked() {
+      return [...document.querySelectorAll('.user-check:checked')].map(cb => Number(cb.dataset.index));
+    }
+
+    function updateSelection() {
+      const indices = getChecked();
+      document.getElementById('selCount').textContent = `${indices.length} selected`;
+      document.querySelectorAll('#usersTable tbody tr').forEach(tr => {
+        const cb = tr.querySelector('.user-check');
+        tr.classList.toggle('selected', cb?.checked);
+      });
+      document.getElementById('checkAll').checked = indices.length === allUsers.length && allUsers.length > 0;
+    }
+
+    function toggleSelectAll(checked) {
+      const state = checked !== undefined ? checked : !document.getElementById('checkAll').checked;
+      document.querySelectorAll('.user-check').forEach(cb => cb.checked = state);
+      document.getElementById('checkAll').checked = state;
+      updateSelection();
+    }
+
+    function deselectAll() {
+      document.querySelectorAll('.user-check').forEach(cb => cb.checked = false);
+      document.getElementById('checkAll').checked = false;
+      updateSelection();
+    }
+
+    /* Mailto helpers */
+    function composeEmail() {
+      const indices = getChecked();
+      if (!indices.length) { alert('Select at least one user.'); return; }
+      const emails = indices.map(i => allUsers[i].email).filter(Boolean);
+      openMailto(emails);
+    }
+
+    function composeEmailAll() {
+      const emails = allUsers.map(u => u.email).filter(Boolean);
+      if (!emails.length) { alert('No users loaded.'); return; }
+      openMailto(emails);
+    }
+
+    function openMailto(bccList) {
+      // desk@incitat.io as visible recipient, users in BCC for privacy
+      const bcc = bccList.join(',');
+      const subject = encodeURIComponent('Ride — ');
+      window.location.href = `mailto:${SUPPORT_EMAIL}?bcc=${encodeURIComponent(bcc)}&subject=${subject}`;
+    }
   </script>
 </body>
 </html>

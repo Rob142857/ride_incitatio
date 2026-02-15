@@ -261,7 +261,7 @@ export const AuthHandler = {
     const { env } = context;
 
     const result = await env.RIDE_TRIP_PLANNER_DB.prepare(
-      'SELECT id, user_id, email, provider, ip, user_agent, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'
+      'SELECT id, user_id, email, provider, ip, user_agent, client_hints, created_at FROM login_events ORDER BY created_at DESC LIMIT 100'
     ).all();
 
     return jsonResponse({ events: result.results || [] });

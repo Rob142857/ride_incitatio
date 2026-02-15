@@ -191,7 +191,7 @@ export const TripsHandler = {
       ).run();
     }
 
-    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM trips WHERE id = ?').bind(params.id).first();
+    const trip = await env.RIDE_TRIP_PLANNER_DB.prepare('SELECT * FROM trips WHERE id = ? AND user_id = ?').bind(params.id, user.id).first();
     return jsonResponse({ trip });
   },
 

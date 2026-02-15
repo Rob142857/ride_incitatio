@@ -86,15 +86,19 @@ export const AttachmentsHandler = {
     const object = await env.RIDE_TRIP_PLANNER_ATTACHMENTS.get(attachment.storage_key);
     if (!object) return errorResponse('File not found', 404);
 
+    // Sanitize filename for Content-Disposition header (strip control chars and quotes)
+    const safeName = (attachment.original_name || 'file').replace(/["\\\x00-\x1f]/g, '_');
+
     const headers = new Headers();
     headers.set('Content-Type', attachment.mime_type);
     headers.set('Content-Length', attachment.size_bytes);
     headers.set('Cache-Control', 'public, max-age=31536000');
+    headers.set('X-Content-Type-Options', 'nosniff');
 
     if (attachment.mime_type.startsWith('image/')) {
-      headers.set('Content-Disposition', `inline; filename="${attachment.original_name}"`);
+      headers.set('Content-Disposition', `inline; filename="${safeName}"`);
     } else {
-      headers.set('Content-Disposition', `attachment; filename="${attachment.original_name}"`);
+      headers.set('Content-Disposition', `attachment; filename="${safeName}"`);
     }
 
     return new Response(object.body, { headers });
