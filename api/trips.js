@@ -168,6 +168,8 @@ export const TripsHandler = {
     if (body.public_description !== undefined) { updates.push('public_description = ?'); values.push(body.public_description); }
     if (body.public_contact !== undefined) { updates.push('public_contact = ?'); values.push(body.public_contact); }
     if (body.cover_image_url !== undefined) { updates.push('cover_image_url = ?'); values.push(body.cover_image_url); }
+    if (body.cover_focus_x !== undefined) { updates.push('cover_focus_x = ?'); values.push(body.cover_focus_x); }
+    if (body.cover_focus_y !== undefined) { updates.push('cover_focus_y = ?'); values.push(body.cover_focus_y); }
 
     if (updates.length > 0) {
       values.push(params.id);

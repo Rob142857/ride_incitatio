@@ -396,6 +396,8 @@ Object.assign(App, {
   },
 
   fillTripDetailsForm(trip) {
+    // Clear any stale blob preview from previous file pick
+    if (this._coverBlobUrl) { URL.revokeObjectURL(this._coverBlobUrl); this._coverBlobUrl = null; }
     document.getElementById('tripDetailName').value = trip.name || '';
     document.getElementById('tripDetailDescription').value = trip.description || '';
     const coverInput = document.getElementById('tripDetailCover');
@@ -406,6 +408,8 @@ Object.assign(App, {
     if (focusYInput) focusYInput.value = Number.isFinite(trip.coverFocusY) ? trip.coverFocusY : (Number.isFinite(trip.cover_focus_y) ? trip.cover_focus_y : 50);
     const coverFileName = document.getElementById('tripDetailCoverFileName');
     if (coverFileName) coverFileName.textContent = '';
+    const coverFileInput = document.getElementById('tripDetailCoverFile');
+    if (coverFileInput) coverFileInput.value = '';
     document.getElementById('tripDetailPublic').checked = !!(trip.isPublic ?? trip.is_public);
     const linkInput = document.getElementById('tripDetailLink');
     const link = trip.shortUrl || trip.short_url || ((trip.shortCode || trip.short_code) ? `${window.location.origin}/${trip.shortCode || trip.short_code}` : '');
@@ -438,6 +442,8 @@ Object.assign(App, {
         UI.showToast('Uploading cover image...', 'info');
         const attachment = await API.attachments.upload(tripId, coverFile, { is_cover: true });
         coverImageUrl = attachment.url;
+        // Clear blob preview now that we have the real URL
+        if (this._coverBlobUrl) { URL.revokeObjectURL(this._coverBlobUrl); this._coverBlobUrl = null; }
         if (coverInput) { coverInput.value = coverImageUrl; this.updateCoverFocusUI(); }
       }
       if (!this.useCloud || !this.currentUser) {

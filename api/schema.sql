@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS trips (
   public_description TEXT, -- Description for public view
   public_contact TEXT, -- Optional contact info
   cover_image_url TEXT, -- Hero image for social sharing
+  cover_focus_x INTEGER NOT NULL DEFAULT 50, -- Background-position X (0-100%)
+  cover_focus_y INTEGER NOT NULL DEFAULT 50, -- Background-position Y (0-100%)
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

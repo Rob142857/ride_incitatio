@@ -63,7 +63,7 @@
     
     <!-- Top Bar -->
     <header id="topBar">
-      <button id="menuBtn" class="icon-btn" aria-label="Menu">
+      <button id="menuBtn" class="icon-btn menu-toggle" aria-label="Menu">
         <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
       </button>
       <div class="topbar-title">
@@ -71,7 +71,10 @@
           <source srcset="/icons/ride-logo.webp" type="image/webp">
           <img src="/icons/ride-logo.png" alt="Ride logo">
         </picture>
-        <h1 id="tripTitle">New Trip</h1>
+        <div class="topbar-trip-info">
+          <span id="tripLabel" class="trip-label">Ride</span>
+          <h1 id="tripTitle">New Trip</h1>
+        </div>
         <div id="tripStats" class="trip-stats"></div>
       </div>
       <div class="topbar-right">

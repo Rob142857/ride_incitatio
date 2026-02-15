@@ -631,10 +631,13 @@ const UI = {
   },
 
   /**
-   * Update trip title
+   * Update trip title and label
    */
   updateTripTitle(name) {
-    document.getElementById('tripTitle').textContent = name;
+    const titleEl = document.getElementById('tripTitle');
+    const labelEl = document.getElementById('tripLabel');
+    if (titleEl) titleEl.textContent = name || 'New Trip';
+    if (labelEl) labelEl.textContent = name ? 'Trip loaded' : 'Ride';
   },
 
   updateTripStats(trip) {

@@ -159,10 +159,21 @@ const App = {
     if (coverFileBtn && coverFileInput) {
       coverFileBtn.addEventListener('click', () => coverFileInput.click());
       coverFileInput.addEventListener('change', () => {
-        coverFileName.textContent = coverFileInput.files?.[0]?.name || '';
+        const file = coverFileInput.files?.[0];
+        if (coverFileName) coverFileName.textContent = file?.name || '';
+        // Show local preview immediately via blob URL
+        if (file && file.type.startsWith('image/')) {
+          if (this._coverBlobUrl) URL.revokeObjectURL(this._coverBlobUrl);
+          this._coverBlobUrl = URL.createObjectURL(file);
+          this.updateCoverFocusUI();
+        }
       });
     }
-    if (coverInput) coverInput.addEventListener('input', () => this.updateCoverFocusUI());
+    if (coverInput) coverInput.addEventListener('input', () => {
+      // Clear blob preview when user types a URL manually
+      if (this._coverBlobUrl) { URL.revokeObjectURL(this._coverBlobUrl); this._coverBlobUrl = null; }
+      this.updateCoverFocusUI();
+    });
     if (focusXInput) focusXInput.addEventListener('input', () => this.updateCoverFocusUI());
     if (focusYInput) focusYInput.addEventListener('input', () => this.updateCoverFocusUI());
 
@@ -193,9 +204,11 @@ const App = {
     if (focusXValue) focusXValue.textContent = `${x}%`;
     if (focusYValue) focusYValue.textContent = `${y}%`;
     if (preview) {
-      const imageUrl = coverInput?.value?.trim();
+      // Prefer local blob preview (file just picked), then fall back to URL input
+      const imageUrl = this._coverBlobUrl || coverInput?.value?.trim() || '';
       preview.style.backgroundImage = imageUrl ? `url('${imageUrl}')` : 'none';
       preview.style.backgroundPosition = `${x}% ${y}%`;
+      preview.style.backgroundSize = 'cover';
     }
   },
 
