@@ -247,6 +247,16 @@ Object.assign(App, {
     this.rideRerouting = false;
     this.offRouteCounter = 0;
 
+    // During ride mode, reroutes are ephemeral — update in-memory route for
+    // navigation HUD only, but do NOT persist to the API.  This prevents the
+    // rider's live GPS position (embedded as the first coordinate of the
+    // rerouted path) from being written to the trip and exposed on the public
+    // trip page.
+    if (this.isRiding) {
+      UI.updateTripStats(this.currentTrip);
+      return;
+    }
+
     UI.updateTripStats(this.currentTrip);
     const ok = await this.saveCurrentTrip();
     if (ok) {
