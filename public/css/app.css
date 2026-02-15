@@ -252,6 +252,14 @@ select:focus-visible {
 }
 
 /* Document Pages (Privacy, Terms, Deletion) */
+html.doc-page,
+html.doc-page body {
+  height: auto !important;
+  overflow: visible !important;
+  overflow-y: auto !important;
+  min-height: 100vh;
+}
+
 .doc-page {
   background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 30%),
               radial-gradient(circle at 80% 0%, rgba(233, 69, 96, 0.12), transparent 26%),
