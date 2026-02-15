@@ -228,18 +228,25 @@ const UI = {
     const menuOverlay = document.getElementById('menuOverlay');
     const sideMenu = document.getElementById('sideMenu');
 
+    const isDesktop = () => window.innerWidth >= 768;
+
     const openMenu = () => {
-      sideMenu.classList.remove('hidden');
-      menuOverlay.classList.remove('hidden');
-      document.body.classList.remove('sidebar-collapsed');
+      if (isDesktop()) {
+        document.body.classList.remove('sidebar-collapsed');
+        setTimeout(() => MapManager.map?.invalidateSize(), 350);
+      } else {
+        sideMenu.classList.remove('hidden');
+        menuOverlay.classList.remove('hidden');
+      }
     };
 
     const closeMenuFn = () => {
-      sideMenu.classList.add('hidden');
-      menuOverlay.classList.add('hidden');
-      // On desktop, mark body so layout shifts
-      if (window.innerWidth >= 768) {
+      if (isDesktop()) {
         document.body.classList.add('sidebar-collapsed');
+        setTimeout(() => MapManager.map?.invalidateSize(), 350);
+      } else {
+        sideMenu.classList.add('hidden');
+        menuOverlay.classList.add('hidden');
       }
     };
 

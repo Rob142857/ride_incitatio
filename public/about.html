@@ -170,7 +170,13 @@
     }
     .features-grid {
       display: grid; gap: 20px;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      grid-template-columns: repeat(3, 1fr);
+    }
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 540px) {
+      .features-grid { grid-template-columns: 1fr; }
     }
     .feature-card {
       padding: 32px 28px; border-radius: var(--radius);
@@ -224,11 +230,9 @@
     }
     @media (max-width: 900px) {
       .gallery-grid { grid-template-columns: repeat(2, 1fr); }
-      .gallery-item--tall { grid-row: span 2; }
     }
     @media (max-width: 540px) {
       .gallery-grid { grid-template-columns: 1fr; }
-      .gallery-item--tall { grid-row: span 1; aspect-ratio: 16 / 10; }
     }
     .gallery-item {
       border-radius: var(--radius); overflow: hidden;
@@ -244,8 +248,7 @@
       transform: translateY(-3px);
       box-shadow: 0 12px 40px rgba(0,0,0,0.4);
     }
-
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
     .gallery-item figcaption {
       position: absolute; bottom: 0; left: 0; right: 0;
       padding: 24px 16px 12px;
@@ -253,7 +256,6 @@
       font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.8);
       letter-spacing: 0.02em;
     }
-    .gallery-item--tall { grid-row: span 2; aspect-ratio: 9 / 16; }
 
     /* ---- Story ---- */
     .story { background: transparent; }
@@ -510,6 +512,10 @@
 
       <div class="gallery-grid">
         <div class="gallery-item">
+          <img src="/images/product/newTripMapView.png" alt="New trip with map view">
+          <figcaption>Map overview</figcaption>
+        </div>
+        <div class="gallery-item">
           <img src="/images/product/addWaypointView.png" alt="Adding a waypoint to a trip">
           <figcaption>Add waypoints</figcaption>
         </div>
@@ -522,20 +528,12 @@
           <figcaption>Trip journal</figcaption>
         </div>
         <div class="gallery-item">
-          <img src="/images/product/tripdetailsmodal.png" alt="Trip details and cover image settings">
-          <figcaption>Trip details</figcaption>
-        </div>
-        <div class="gallery-item">
           <img src="/images/product/navigationTurnbyTurnView.png" alt="Turn-by-turn navigation on the map">
           <figcaption>Turn-by-turn routing</figcaption>
         </div>
-        <div class="gallery-item gallery-item--tall">
+        <div class="gallery-item">
           <img src="/images/product/mobileNavigationView.png" alt="Mobile navigation view">
           <figcaption>Mobile ride mode</figcaption>
-        </div>
-        <div class="gallery-item">
-          <img src="/images/product/newTripMapView.png" alt="New trip with map view">
-          <figcaption>Map overview</figcaption>
         </div>
       </div>
     </div>

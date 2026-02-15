@@ -2698,17 +2698,20 @@ body.ride-mode .leaflet-control-zoom {
   display: none !important;
 }
 
-/* ===== DESKTOP: sidebar always visible ===== */
+/* ===== DESKTOP ===== */
 @media (min-width: 768px) {
-  /* Sidebar: visible by default on desktop, collapsible */
-  #sideMenu {
+  /* Sidebar: show via transform (not display) so .hidden doesn't interfere */
+  #sideMenu,
+  #sideMenu.hidden {
     display: flex !important;
     transform: translateX(0) !important;
     box-shadow: none;
     z-index: 90;
   }
 
-  #sideMenu.hidden {
+  /* When collapsed, slide off-screen */
+  body.sidebar-collapsed #sideMenu,
+  body.sidebar-collapsed #sideMenu.hidden {
     transform: translateX(-100%) !important;
   }
 
@@ -2721,12 +2724,12 @@ body.ride-mode .leaflet-control-zoom {
     display: flex !important;
   }
 
-  /* Hide overlay on desktop (sidebar doesn't need it) */
+  /* Hide overlay on desktop */
   #menuOverlay {
     display: none !important;
   }
 
-  /* Shift everything right of sidebar when open */
+  /* Shift content right when sidebar is open (default) */
   #topBar {
     left: var(--sidebar-width);
     transition: left 0.35s var(--ease-smooth);
@@ -2767,6 +2770,10 @@ body.ride-mode .leaflet-control-zoom {
   /* Toast should center in the content area */
   #toast {
     left: calc(50% + var(--sidebar-width) / 2);
+  }
+
+  body.sidebar-collapsed #toast {
+    left: 50%;
   }
 }
 
