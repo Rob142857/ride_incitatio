@@ -219,6 +219,7 @@ export const AuthHandler = {
    * Get current logged-in user
    */
   async getCurrentUser(context) {
+    console.log('[auth/me] user:', JSON.stringify(context.user));
     return jsonResponse({ user: context.user });
   },
   

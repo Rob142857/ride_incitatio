@@ -893,6 +893,7 @@ const App = {
     const userInitial = document.getElementById('userInitial');
     
     if (this.currentUser) {
+      console.log('[updateUserUI] user:', this.currentUser.name, 'avatar:', this.currentUser.avatar_url);
       userBtn.classList.add('logged-in');
       if (this.currentUser.avatar_url) {
         userAvatar.src = this.currentUser.avatar_url;
@@ -901,9 +902,12 @@ const App = {
       } else {
         // Show initial-based avatar when no photo is available
         userAvatar.classList.add('hidden');
+        userAvatar.removeAttribute('src');
         const name = this.currentUser.name || this.currentUser.email || '?';
-        userInitial.textContent = name.charAt(0);
-        userInitial.style.background = this._initialColor(name);
+        const letter = name.charAt(0).toUpperCase();
+        console.log('[updateUserUI] showing initial:', letter);
+        userInitial.textContent = letter;
+        userInitial.style.backgroundColor = this._initialColor(name);
         userInitial.classList.remove('hidden');
       }
     } else {

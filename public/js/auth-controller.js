@@ -156,16 +156,38 @@ Object.assign(App, {
   updateUserUI() {
     const userBtn = document.getElementById('userBtn');
     const userAvatar = document.getElementById('userAvatar');
+    const userInitial = document.getElementById('userInitial');
     if (this.currentUser) {
       userBtn.classList.add('logged-in');
       if (this.currentUser.avatar_url) {
         userAvatar.src = this.currentUser.avatar_url;
         userAvatar.classList.remove('hidden');
+        if (userInitial) userInitial.classList.add('hidden');
+      } else if (userInitial) {
+        // No photo — show coloured initial
+        userAvatar.classList.add('hidden');
+        userAvatar.removeAttribute('src');
+        const name = this.currentUser.name || this.currentUser.email || '?';
+        userInitial.textContent = name.charAt(0).toUpperCase();
+        userInitial.style.backgroundColor = this._initialColor(name);
+        userInitial.classList.remove('hidden');
       }
     } else {
       userBtn.classList.remove('logged-in');
       userAvatar.classList.add('hidden');
+      if (userInitial) userInitial.classList.add('hidden');
     }
+  },
+
+  /** Deterministic colour from a string */
+  _initialColor(str) {
+    const palette = [
+      '#6366f1','#8b5cf6','#a855f7','#ec4899','#ef4444','#f97316',
+      '#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#0ea5e9'
+    ];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return palette[Math.abs(hash) % palette.length];
   },
 
   showUserDropdown() {

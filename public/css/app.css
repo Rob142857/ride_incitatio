@@ -1275,9 +1275,8 @@ body.ride-mode .leaflet-control-zoom {
 
 /* Initial-based avatar fallback */
 .user-initial {
-  display: none;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   border-radius: var(--radius-btn);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -1285,14 +1284,15 @@ body.ride-mode .leaflet-control-zoom {
   line-height: 1;
   color: #fff;
   text-transform: uppercase;
+  display: flex;
   align-items: center;
   justify-content: center;
   user-select: none;
   letter-spacing: 0.02em;
 }
 
-.user-btn.logged-in .user-initial:not(.hidden) {
-  display: flex;
+.user-initial.hidden {
+  display: none !important;
 }
 
 /* User dropdown menu */
