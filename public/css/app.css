@@ -1269,8 +1269,30 @@ body.ride-mode .leaflet-control-zoom {
   display: none;
 }
 
-.user-btn.logged-in .user-avatar {
+.user-btn.logged-in .user-avatar:not(.hidden) {
   display: block;
+}
+
+/* Initial-based avatar fallback */
+.user-initial {
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-transform: uppercase;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+.user-btn.logged-in .user-initial:not(.hidden) {
+  display: flex;
 }
 
 /* User dropdown menu */

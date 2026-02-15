@@ -331,15 +331,17 @@ async function createOrUpdateUser(db, userData) {
     ).bind(provider, provider_id).first();
 
     if (existingIdentity) {
+      // Only overwrite avatar_url if the new provider actually supplies one
+      const effectiveAvatar = avatar_url || existingIdentity.avatar_url;
       await db.prepare(
-        'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+        'UPDATE users SET email = ?, name = ?, avatar_url = COALESCE(?, avatar_url), last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
       ).bind(normalizedEmail, name, avatar_url, existingIdentity.id).run();
 
       await db.prepare(
         'UPDATE auth_identities SET email = ?, last_login = datetime("now") WHERE provider = ? AND provider_id = ?'
       ).bind(normalizedEmail, provider, provider_id).run();
 
-      return { ...existingIdentity, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+      return { ...existingIdentity, email: normalizedEmail, name, avatar_url: effectiveAvatar, provider, provider_id, last_login: new Date().toISOString() };
     }
 
     const existingUser = await db.prepare('SELECT * FROM users WHERE email = ?').bind(normalizedEmail).first();
@@ -353,11 +355,12 @@ async function createOrUpdateUser(db, userData) {
         // Ignore if a concurrent login already inserted it.
       }
 
+      const effectiveAvatar = avatar_url || existingUser.avatar_url;
       await db.prepare(
-        'UPDATE users SET name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+        'UPDATE users SET name = ?, avatar_url = COALESCE(?, avatar_url), last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
       ).bind(name, avatar_url, existingUser.id).run();
 
-      return { ...existingUser, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+      return { ...existingUser, name, avatar_url: effectiveAvatar, provider, provider_id, last_login: new Date().toISOString() };
     }
 
     // Create new user + first linked identity.
@@ -380,10 +383,11 @@ async function createOrUpdateUser(db, userData) {
     ).bind(provider, provider_id).first();
 
     if (existingByProvider) {
+      const effectiveAvatar = avatar_url || existingByProvider.avatar_url;
       await db.prepare(
-        'UPDATE users SET email = ?, name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+        'UPDATE users SET email = ?, name = ?, avatar_url = COALESCE(?, avatar_url), last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
       ).bind(normalizedEmail, name, avatar_url, existingByProvider.id).run();
-      return { ...existingByProvider, email: normalizedEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+      return { ...existingByProvider, email: normalizedEmail, name, avatar_url: effectiveAvatar, provider, provider_id, last_login: new Date().toISOString() };
     }
 
     // Then try email match to merge accounts across providers
@@ -392,10 +396,11 @@ async function createOrUpdateUser(db, userData) {
     if (existingByEmail) {
       // IMPORTANT: do not create a second user for the same email.
       // In legacy mode we cannot persist multiple identities, so we keep the existing user record.
+      const effectiveAvatar = avatar_url || existingByEmail.avatar_url;
       await db.prepare(
-        'UPDATE users SET name = ?, avatar_url = ?, last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+        'UPDATE users SET name = ?, avatar_url = COALESCE(?, avatar_url), last_login = datetime("now"), updated_at = datetime("now") WHERE id = ?'
       ).bind(name, avatar_url, existingByEmail.id).run();
-      return { ...existingByEmail, name, avatar_url, provider, provider_id, last_login: new Date().toISOString() };
+      return { ...existingByEmail, name, avatar_url: effectiveAvatar, provider, provider_id, last_login: new Date().toISOString() };
     }
 
     // Create new user

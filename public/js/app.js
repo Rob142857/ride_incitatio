@@ -890,17 +890,52 @@ const App = {
     const userBtn = document.getElementById('userBtn');
     const userIcon = document.getElementById('userIcon');
     const userAvatar = document.getElementById('userAvatar');
+    const userInitial = document.getElementById('userInitial');
     
     if (this.currentUser) {
       userBtn.classList.add('logged-in');
       if (this.currentUser.avatar_url) {
         userAvatar.src = this.currentUser.avatar_url;
         userAvatar.classList.remove('hidden');
+        userInitial.classList.add('hidden');
+      } else {
+        // Show initial-based avatar when no photo is available
+        userAvatar.classList.add('hidden');
+        const name = this.currentUser.name || this.currentUser.email || '?';
+        userInitial.textContent = name.charAt(0);
+        userInitial.style.background = this._initialColor(name);
+        userInitial.classList.remove('hidden');
       }
     } else {
       userBtn.classList.remove('logged-in');
       userAvatar.classList.add('hidden');
+      userInitial.classList.add('hidden');
     }
+  },
+
+  /**
+   * Deterministic colour from a string — warm, muted palette that works on dark UI
+   */
+  _initialColor(str) {
+    const palette = [
+      '#6366f1', // indigo
+      '#8b5cf6', // violet
+      '#a855f7', // purple
+      '#ec4899', // pink
+      '#ef4444', // red
+      '#f97316', // orange
+      '#eab308', // yellow
+      '#22c55e', // green
+      '#14b8a6', // teal
+      '#06b6d4', // cyan
+      '#3b82f6', // blue
+      '#0ea5e9', // sky
+    ];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return palette[Math.abs(hash) % palette.length];
   },
 
   /**
