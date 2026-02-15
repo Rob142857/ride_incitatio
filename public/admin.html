@@ -13,13 +13,6 @@
     .subtitle { color: var(--neutral-500); font-size: 0.85rem; margin: 0 0 16px; }
     .hidden { display: none !important; }
 
-    /* Auth gate */
-    #authGate { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
-    #authGate input { flex: 1; max-width: 340px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-btn); font-family: var(--font-mono); font-size: 0.85rem; }
-    #authGate button { padding: 8px 16px; border: none; border-radius: var(--radius-btn); background: var(--accent); color: var(--white); cursor: pointer; font-size: 0.85rem; font-weight: 500; }
-    #authGate button:hover { opacity: 0.85; }
-    #status { color: var(--neutral-500); font-size: 0.85rem; margin-bottom: 12px; }
-
     /* Toolbar */
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
     .toolbar button { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-btn); background: var(--white); cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: background var(--transition-fast); }
@@ -46,15 +39,10 @@
 <body>
   <h1>Ride Admin</h1>
   <p class="subtitle">User management and audit log &middot; desk@incitat.io</p>
-
-  <div id="authGate">
-    <input type="password" id="adminKey" placeholder="Admin API key" autocomplete="off" />
-    <button onclick="authenticate()">Connect</button>
-  </div>
-  <div id="status"></div>
+  <div id="status" style="color:var(--neutral-500);font-size:0.85rem;margin-bottom:12px"></div>
 
   <!-- Users section -->
-  <div id="usersSection" class="hidden">
+  <div id="usersSection">
     <h2>Users</h2>
     <div class="toolbar">
       <button onclick="toggleSelectAll()">Select All</button>
@@ -102,7 +90,6 @@
 
   <script>
     const SUPPORT_EMAIL = 'desk@incitat.io';
-    let adminKey = '';
     let allUsers = [];
 
     function esc(s) {
@@ -111,29 +98,15 @@
       return d.innerHTML;
     }
 
-    function authenticate() {
-      adminKey = document.getElementById('adminKey').value.trim();
-      if (!adminKey) return;
-      document.getElementById('authGate').classList.add('hidden');
-      document.getElementById('status').textContent = 'Loading…';
-      loadUsers();
-      loadLogins();
-    }
-
-    // Allow Enter key to authenticate
-    document.getElementById('adminKey').addEventListener('keydown', e => {
-      if (e.key === 'Enter') authenticate();
-    });
-
-    function headers() {
-      return { 'x-admin-key': adminKey };
-    }
+    // Auto-load on page ready (protected by Cloudflare Zero Trust)
+    document.getElementById('status').textContent = 'Loading…';
+    loadUsers();
+    loadLogins();
 
     async function loadUsers() {
       const status = document.getElementById('status');
       try {
-        const res = await fetch('/api/admin/users', { headers: headers() });
-        if (res.status === 401) { status.textContent = 'Invalid admin key.'; document.getElementById('authGate').classList.remove('hidden'); return; }
+        const res = await fetch('/api/admin/users');
         if (!res.ok) throw new Error('Request failed');
         const data = await res.json();
         allUsers = data.users || [];
@@ -155,7 +128,6 @@
         });
 
         status.textContent = `${allUsers.length} user${allUsers.length === 1 ? '' : 's'}`;
-        document.getElementById('usersSection').classList.remove('hidden');
       } catch (err) {
         status.textContent = 'Failed to load users.';
         console.error(err);
@@ -164,7 +136,7 @@
 
     async function loadLogins() {
       try {
-        const res = await fetch('/api/admin/logins', { headers: headers() });
+        const res = await fetch('/api/admin/logins');
         if (!res.ok) return;
         const data = await res.json();
         const tbody = document.querySelector('#loginsTable tbody');

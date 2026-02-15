@@ -13,12 +13,12 @@ import { AttachmentsHandler } from './attachments.js';
 import { ShareHandler } from './share.js';
 import { AccountHandler } from './account.js';
 import { PlacesHandler } from './places.js';
-import { cors, jsonResponse, errorResponse, requireAuth, requireAdmin, optionalAuth, BASE_URL } from './utils.js';
+import { cors, jsonResponse, errorResponse, requireAuth, optionalAuth, BASE_URL } from './utils.js';
 
 // Build fingerprint — changes on every deploy. Used by service worker and client
 // to detect code updates and trigger cache invalidation + seamless reload.
 // Updated automatically by deploy script, or manually before shipping.
-const BUILD_ID = '2026-02-15T17';
+const BUILD_ID = '2026-02-15T18';
 
 const router = new Router();
 
@@ -30,8 +30,8 @@ router.get('/api/auth/login/:provider', AuthHandler.initiateLogin);
 router.get('/api/auth/callback/:provider', AuthHandler.handleCallback);
 router.get('/api/auth/me', requireAuth, AuthHandler.getCurrentUser);
 router.post('/api/auth/logout', AuthHandler.logout);
-router.get('/api/admin/users', requireAdmin, AuthHandler.listUsersAdmin);
-router.get('/api/admin/logins', requireAdmin, AuthHandler.listLoginsAdmin);
+router.get('/api/admin/users', AuthHandler.listUsersAdmin);
+router.get('/api/admin/logins', AuthHandler.listLoginsAdmin);
 
 // Trip routes (protected)
 router.get('/api/trips', requireAuth, TripsHandler.listTrips);
